@@ -349,13 +349,20 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
      */
     private _setBadge(count: number): void {
         if (this._view) {
-            this._view.badge = count > 0
-                ? { value: count, tooltip: strings.inputRequired }
-                : undefined;
+            if (count === 0) {
+                // Workaround for VS Code API: set to 0 first, then undefined
+                // This ensures the badge properly clears in the UI
+                this._view.badge = { value: 0, tooltip: '' };
+                setTimeout(() => {
+                    if (this._view && this._pendingRequests.size === 0) {
+                        this._view.badge = undefined;
+                    }
+                }, 100);
+            } else {
+                this._view.badge = { value: count, tooltip: strings.inputRequired };
+            }
         }
-    }
-
-    /**
+    }    /**
      * Show a notification to alert the user of a pending request
      */
     private _showNotification(): void {
