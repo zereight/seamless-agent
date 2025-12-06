@@ -61,6 +61,13 @@ Nenhum até o momento. Por favor, reporte problemas no [GitHub](https://github.c
 
 ## Notas de Versão
 
+### 0.1.4
+
+#### Corrigido
+
+- **Contador de Requisições**: Corrigido badge que não resetava para 0 após todas as requisições serem fechadas (estava mostrando "1" incorretamente)
+- **Comportamento de Notificação**: Notificações agora aparecem apenas quando o painel Seamless Agent não está visível, reduzindo interrupções quando o painel já está aberto
+
 ### 0.1.3
 
 - [jraylan:feature/dedicated-view-panel](https://github.com/jraylan/seamless-agent/pull/6)

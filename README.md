@@ -61,6 +61,13 @@ None at this time. Please report issues on [GitHub](https://github.com/jraylan/s
 
 ## Release Notes
 
+## 0.1.4
+
+### Fixed
+
+- **Badge Counter**: Fixed badge not resetting to 0 after all requests are closed (was showing "1" incorrectly)
+- **Notification Behavior**: Notifications now only appear when the Seamless Agent panel is not visible, reducing interruptions when the panel is already open
+
 ## 0.1.3
 
 - [jraylan:feature/dedicated-view-panel](https://github.com/jraylan/seamless-agent/pull/6)

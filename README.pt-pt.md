@@ -61,6 +61,13 @@ Nenhum até ao momento. Por favor, reporte problemas no [GitHub](https://github.
 
 ## Notas de Versão
 
+### 0.1.4
+
+#### Corrigido
+
+- **Contador de Pedidos**: Corrigido distintivo que não reiniciava para 0 após todos os pedidos serem fechados (estava a mostrar "1" incorretamente)
+- **Comportamento de Notificação**: Notificações agora aparecem apenas quando o painel Seamless Agent não está visível, reduzindo interrupções quando o painel já está aberto
+
 ### 0.1.3
 
 - [jraylan:feature/dedicated-view-panel](https://github.com/jraylan/seamless-agent/pull/6)
