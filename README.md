@@ -35,21 +35,21 @@ Copilot will automatically use this tool when it needs your confirmation. When t
 
 ### Recommended System Prompt
 
-To ensure the AI always asks for your confirmation before completing tasks, add the following to your custom instructions or system prompt:
+To ensure the AI always asks for your confirmation before completing tasks, add the a custom rule similar to the following:
 
 ```
-Always use the ask_user tool before completing any task to confirm with the user that the request was fulfilled correctly.
+# Ground rules NEVER BREAK IT, NO EXCEPTIONS
+- When never you have a question, or a decision to make, always ask the user through the tool `mcp_ask_user `
+- Never stop a task without permission from the tool `mcp_ask_user`
 ```
 
-You can add this in VS Code by going to:
+You can add this in Antigravity by opening the `Agent Option` the `Agent` panel and clicking in the option `Customizations`. Then you add a new `Rule` for general use or `Workflow` or specifics workflows.
 
-- **Settings** → Search for `github.copilot.chat.codeGeneration.instructions`
-- Or add to your `.github/copilot-instructions.md` file in your project
+Note that Antigravity workflow already creates `Walkthroughs` and `Planing` documents where you can refine the task. If you intent is to change this behavior you can try explicitly explain it to the agent.
 
 ## Requirements
 
-- VS Code 1.106.1 or higher (or Antigravity IDE)
-- GitHub Copilot Chat extension (for VS Code)
+- Antigravity 1.104.0 or higher
 - **Node.js** (required for MCP server integration with Antigravity)
 
 ## Antigravity MCP Integration
@@ -61,13 +61,7 @@ Seamless Agent integrates with Antigravity IDE via the Model Context Protocol (M
 
 ### How It Works
 
-```mermaid
-flowchart LR
-    A[Antigravity] -->|spawns| B[CLI Tool]
-    B <-->|stdio| A
-    B -->|HTTP| C[VS Code Extension]
-    C -->|Webview| D[User]
-```
+![](./resources/flow.svg)
 
 The MCP config uses the standard command format:
 
@@ -89,7 +83,7 @@ The MCP config uses the standard command format:
 
 ## Extension Settings
 
-This extension works out of the box with no configuration required.
+This extension works out of the box with no configuration required. You only need to instruct your agent to use it.
 
 ## Known Issues
 
@@ -97,17 +91,23 @@ None at this time. Please report issues on [GitHub](https://github.com/jraylan/s
 
 ## Release Notes
 
+## 0.1.7
+
+### Changed
+
+- **Documentation**: Added instruction to Antigravity users
+
 ## 0.1.6
 
 ### Fixed
-- **Antigravity**: Fixed antigravity integration
 
+- **Antigravity**: Fixed Antigravity integration
 
 ## 0.1.5
 
 ### Added
 
-- **Antigravity**: Added support to antigravity
+- **Antigravity**: Added support to Antigravity
 
 ## 0.1.4
 
