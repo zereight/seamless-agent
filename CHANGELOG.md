@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.10](https://github.com/jraylan/seamless-agent/compare/v0.1.9...v0.1.10) (2025-12-14)
+
+
+### Bug Fixes
+
+* harden local API service ([8ad4f67](https://github.com/jraylan/seamless-agent/commit/8ad4f671aa08196992e78a739979ab6d76bc563f))
+
 ## [0.1.9](https://github.com/jraylan/seamless-agent/compare/v0.1.8...v0.1.9) (2025-12-14)
 
 ### Features
