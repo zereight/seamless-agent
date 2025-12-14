@@ -29,7 +29,6 @@ export const DEFAULT_IGNORED_SOURCE_GLOBS = [
     "**/.pnpm-store/**",
 
     // Java / Kotlin
-    "**/target/**",
     "**/out/**",
     "**/.gradle/**",
     "**/.mvn/**",
