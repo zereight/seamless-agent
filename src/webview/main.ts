@@ -93,6 +93,10 @@ declare global {
             selectFile: string;
             noFilesFound: string;
             dropImageHere: string;
+            noPendingRequests: string;
+            noRecentSessions: string;
+            input: string;
+            output: string;
         };
     }
 }
@@ -107,6 +111,9 @@ interface AttachmentInfo {
     isImage?: boolean;
     isTextReference?: boolean;  // True if added via #name syntax (should be synced with text)
     thumbnail?: string;  // Base64 data URL for image preview
+    isFolder?: boolean;  // True if this is a folder reference
+    folderPath?: string; // Path to the folder
+    depth?: number;      // Folder depth (0=current, 1=1 level, 2=2 levels, -1=recursive)
 }
 
 interface RequestItem {
@@ -122,6 +129,22 @@ interface FileSearchResult {
     path: string;
     uri: string;
     icon: string;
+    isFolder?: boolean;  // True if this is a folder result
+}
+
+// Session History Types (mirroring sessionHistory.ts)
+interface ToolCallInteraction {
+    id: string;
+    timestamp: number;
+    input: {
+        question: string;
+        title: string;
+    };
+    output: {
+        response: string;
+        attachments: AttachmentInfo[];
+    };
+    status: 'completed' | 'cancelled';
 }
 
 // Webview initialization
@@ -143,7 +166,10 @@ interface FileSearchResult {
     let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     // DOM Elements
-    const emptyState = document.getElementById('empty-state');
+    const homeView = document.getElementById('home-view');
+    const pendingRequestsList = document.getElementById('pending-requests-list');
+    const recentInteractionsList = document.getElementById('recent-interactions-list');
+    const clearHistoryBtn = document.getElementById('clear-history-btn');
     const requestHeader = document.getElementById('request-header');
     const requestList = document.getElementById('request-list');
     const requestListItems = document.getElementById('request-list-items');
@@ -152,6 +178,22 @@ interface FileSearchResult {
     const responseInput = document.getElementById('response-input') as HTMLTextAreaElement;
     const submitBtn = document.getElementById('submit-btn');
     const cancelBtn = document.getElementById('cancel-btn');
+    const srAnnounce = document.getElementById('sr-announce');
+
+    /**
+     * Announce a message to screen readers via the live region
+     * @param message The message to announce
+     */
+    function announceToScreenReader(message: string): void {
+        if (srAnnounce) {
+            // Clear and set text to trigger announcement
+            srAnnounce.textContent = '';
+            // Use setTimeout to ensure the DOM change is detected
+            setTimeout(() => {
+                srAnnounce.textContent = message;
+            }, 50);
+        }
+    }
     const backBtn = document.getElementById('back-btn');
     const headerTitle = document.getElementById('header-title');
     const chipsContainer = document.getElementById('chips-container');
@@ -161,6 +203,9 @@ interface FileSearchResult {
     const dropZone = document.getElementById('drop-zone');
     const attachBtn = document.getElementById('attach-btn');
 
+    // Interaction history state
+    let recentInteractions: ToolCallInteraction[] = [];
+
     /**
  * Show the list of pending requests
  */
@@ -168,21 +213,22 @@ interface FileSearchResult {
         hasMultipleRequests = requests.length > 1;
 
         if (requests.length === 0) {
-            showEmpty();
+            // No pending requests - show placeholder in pending section
+            if (pendingRequestsList) {
+                pendingRequestsList.innerHTML = `<p class="placeholder">${window.__STRINGS__?.noPendingRequests || 'No pending requests'}</p>`;
+            }
             return;
         }
 
-        // Hide other views
-        emptyState?.classList.add('hidden');
+        // Hide other views, show home view
         requestForm?.classList.add('hidden');
         requestHeader?.classList.add('hidden');
+        requestList?.classList.add('hidden');
+        homeView?.classList.remove('hidden');
 
-        // Show list
-        requestList?.classList.remove('hidden');
-
-        // Render list items
-        if (requestListItems) {
-            requestListItems.innerHTML = requests.map(req => `
+        // Render pending requests in home view
+        if (pendingRequestsList) {
+            pendingRequestsList.innerHTML = requests.map(req => `
                 <div class="request-item" data-id="${req.id}" tabindex="0">
                     <div class="request-item-title">${escapeHtml(req.title)}</div>
                     <div class="request-item-preview">${escapeHtml(truncate(req.question, 100))}</div>
@@ -191,20 +237,16 @@ interface FileSearchResult {
             `).join('');
 
             // Bind click events
-            requestListItems.querySelectorAll('.request-item').forEach(item => {
+            pendingRequestsList.querySelectorAll('.request-item').forEach(item => {
                 item.addEventListener('click', () => {
                     const id = item.getAttribute('data-id');
 
                     if (id) {
                         vscode.postMessage({
                             type: 'selectRequest', requestId: id
-                        }
-
-                        );
+                        });
                     }
-                }
-
-                );
+                });
 
                 item.addEventListener('keydown', (e: Event) => {
                     const keyEvent = e as KeyboardEvent;
@@ -216,17 +258,11 @@ interface FileSearchResult {
                         if (id) {
                             vscode.postMessage({
                                 type: 'selectRequest', requestId: id
-                            }
-
-                            );
+                            });
                         }
                     }
-                }
-
-                );
-            }
-
-            );
+                });
+            });
         }
     }
 
@@ -252,7 +288,7 @@ interface FileSearchResult {
         }
 
         // Hide other views
-        emptyState?.classList.add('hidden');
+        homeView?.classList.add('hidden');
         requestList?.classList.add('hidden');
 
         // Show header and form
@@ -267,20 +303,149 @@ interface FileSearchResult {
     }
 
     /**
- * Show empty state
- */
-    function showEmpty(): void {
+     * Show home view (pending requests + recent interactions)
+     */
+    function showHome(): void {
         currentRequestId = null;
         hasMultipleRequests = false;
 
-        emptyState?.classList.remove('hidden');
+        // Hide other views
         requestForm?.classList.add('hidden');
         requestList?.classList.add('hidden');
         requestHeader?.classList.add('hidden');
 
+        // Show home view
+        homeView?.classList.remove('hidden');
+
+        // Update pending requests placeholder if empty
+        if (pendingRequestsList && pendingRequestsList.children.length === 0) {
+            pendingRequestsList.innerHTML = `<p class="placeholder">${window.__STRINGS__?.noPendingRequests || 'No pending requests'}</p>`;
+        }
+
+        // Render recent interactions
+        renderRecentInteractions();
+
         if (responseInput) {
             responseInput.value = '';
         }
+    }
+
+    /**
+     * Render the recent interactions list
+     */
+    /**
+     * Extract a meaningful title from the LLM's input question
+     * Uses the first sentence (up to ~80 chars) as the title
+     */
+    function extractTitleFromQuestion(question: string): string {
+        if (!question) return 'Tool Call';
+
+        // Remove markdown formatting for cleaner extraction
+        let text = question
+            .replace(/^\s*#+\s*/gm, '')  // Remove heading markers
+            .replace(/\*\*([^*]+)\*\*/g, '$1')  // Remove bold
+            .replace(/\*([^*]+)\*/g, '$1')  // Remove italic
+            .replace(/`([^`]+)`/g, '$1')  // Remove inline code
+            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')  // Remove links, keep text
+            .trim();
+
+        // Get first sentence (ending with . ! ? or first line)
+        const sentenceMatch = text.match(/^[^.!?\n]+[.!?]?/);
+        let firstSentence = sentenceMatch ? sentenceMatch[0].trim() : text.split('\n')[0].trim();
+
+        // Truncate to ~80 chars if too long
+        if (firstSentence.length > 80) {
+            firstSentence = firstSentence.substring(0, 77).trim() + '...';
+        }
+
+        return firstSentence || 'Tool Call';
+    }
+
+    function renderRecentInteractions(): void {
+        if (!recentInteractionsList) return;
+
+        if (recentInteractions.length === 0) {
+            recentInteractionsList.innerHTML = `<p class="placeholder">${window.__STRINGS__?.noRecentSessions || 'No recent tool calls'}</p>`;
+            return;
+        }
+
+        recentInteractionsList.innerHTML = recentInteractions.map((interaction, index) => {
+            // Use first sentence of LLM's input as title instead of the redundant original title
+            const title = extractTitleFromQuestion(interaction.input.question);
+            const statusClass = interaction.status === 'completed' ? 'completed' : 'cancelled';
+            const iconName = interaction.status === 'completed' ? 'check' : 'x';
+            // Only first item (newest) is expanded by default
+            const isExpanded = index === 0;
+            const collapsedClass = isExpanded ? '' : 'collapsed';
+            const chevronIcon = isExpanded ? 'chevron-down' : 'chevron-right';
+
+            return `
+                <div class="interaction-item ${statusClass} ${collapsedClass}" data-interaction-id="${interaction.id}">
+                    <div class="interaction-header" role="button" tabindex="0" aria-expanded="${isExpanded}">
+                        <div class="interaction-chevron">
+                            <span class="codicon codicon-${chevronIcon}"></span>
+                        </div>
+                        <div class="interaction-icon">
+                            <span class="codicon codicon-${iconName}"></span>
+                        </div>
+                        <div class="interaction-title">${escapeHtml(title)}</div>
+                        <div class="interaction-time">${formatTime(interaction.timestamp)}</div>
+                    </div>
+                    <div class="interaction-body">
+                        <div class="interaction-section">
+                            <div class="interaction-section-label">
+                                <span class="codicon codicon-hubot"></span>
+                                AI
+                            </div>
+                            <div class="interaction-content">${renderMarkdown(interaction.input.question)}</div>
+                        </div>
+                        <div class="interaction-section">
+                            <div class="interaction-section-label">
+                                <span class="codicon codicon-account"></span>
+                                USER
+                            </div>
+                            <div class="interaction-content">${interaction.output.response ? escapeHtml(interaction.output.response) : '<em>No response</em>'}</div>
+                            ${interaction.output.attachments && interaction.output.attachments.length > 0 ? `
+                                <div class="interaction-attachments">
+                                    ${interaction.output.attachments.map(att => `
+                                        <span class="attachment-chip">
+                                            <span class="codicon codicon-${att.isFolder ? 'folder' : 'file'}"></span>
+                                            ${escapeHtml(att.name)}
+                                        </span>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Add click handlers to toggle collapsed state
+        recentInteractionsList.querySelectorAll('.interaction-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const item = header.closest('.interaction-item');
+                if (item) {
+                    const isCollapsed = item.classList.toggle('collapsed');
+                    header.setAttribute('aria-expanded', String(!isCollapsed));
+                    const chevron = header.querySelector('.interaction-chevron .codicon');
+                    if (chevron) {
+                        chevron.className = `codicon codicon-${isCollapsed ? 'chevron-right' : 'chevron-down'}`;
+                    }
+                    // Announce state change to screen readers
+                    const title = item.querySelector('.interaction-title')?.textContent || 'Tool call';
+                    announceToScreenReader(`${title}, ${isCollapsed ? 'collapsed' : 'expanded'}`);
+                }
+            });
+
+            header.addEventListener('keydown', (e: Event) => {
+                const keyEvent = e as KeyboardEvent;
+                if (keyEvent.key === 'Enter' || keyEvent.key === ' ') {
+                    e.preventDefault();
+                    (header as HTMLElement).click();
+                }
+            });
+        });
     }
 
     /**
@@ -303,15 +468,30 @@ interface FileSearchResult {
             chipsContainer.classList.remove('hidden');
             chipsContainer.innerHTML = currentAttachments.map(att => {
                 const isImage = att.isImage || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(att.name);
+                const isFolder = att.isFolder;
 
-                // For images, show a friendly "Pasted Image" label with image icon
-                // For files, show icon + filename
-                const displayName = isImage && att.id.startsWith('img_') ? 'Pasted Image' : att.name;
-                const iconClass = isImage ? 'file-media' : getFileIcon(att.name);
-                const chipClass = isImage ? 'chip chip-image' : 'chip';
+                // Determine display name and icon
+                let displayName: string;
+                let iconClass: string;
+                let chipClass: string;
+
+                if (isFolder) {
+                    displayName = att.name;
+                    iconClass = 'folder';
+                    chipClass = 'chip chip-folder';
+                    // No depth indicator - just show folder name
+                } else if (isImage) {
+                    displayName = att.id.startsWith('img_') ? 'Pasted Image' : att.name;
+                    iconClass = 'file-media';
+                    chipClass = 'chip chip-image';
+                } else {
+                    displayName = att.name;
+                    iconClass = getFileIcon(att.name);
+                    chipClass = 'chip';
+                }
 
                 return `
-                <div class="${chipClass}" data-id="${att.id}" title="${escapeHtml(att.name)}">
+                <div class="${chipClass}" data-id="${att.id}" title="${escapeHtml(att.folderPath || att.uri || att.name)}">
                     <span class="chip-icon"><span class="codicon codicon-${iconClass}"></span></span>
                     <span class="chip-text">${escapeHtml(displayName)}</span>
                     <button class="chip-remove" data-remove="${att.id}" title="${window.__STRINGS__?.remove || 'Remove'}" aria-label="Remove ${escapeHtml(att.name)}">
@@ -362,13 +542,11 @@ interface FileSearchResult {
                 response: response,
                 requestId: currentRequestId,
                 attachments: currentAttachments
-            }
-
-            );
+            });
         }
 
         currentAttachments = [];
-        showEmpty();
+        // Don't show home - the extension will send showCurrentSession or showSessionDetail
     }
 
     /**
@@ -379,37 +557,30 @@ interface FileSearchResult {
             vscode.postMessage({
                 type: 'cancel',
                 requestId: currentRequestId
-            }
-
-            );
+            });
         }
 
         currentAttachments = [];
-        showEmpty();
+        // Don't show home - the extension will send showCurrentSession or showSessionDetail
     }
 
     /**
- * Handle back button click
- */
+     * Handle back button click
+     */
     function handleBack(): void {
-        vscode.postMessage({
-            type: 'backToList'
-        }
-
-        );
+        // Go back to list or home
+        vscode.postMessage({ type: 'backToList' });
     }
 
     /**
- * Handle add attachment button click
- */
+     * Handle add attachment button click
+     */
     function handleAddAttachment(): void {
         if (currentRequestId) {
             vscode.postMessage({
                 type: 'addAttachment',
                 requestId: currentRequestId
-            }
-
-            );
+            });
         }
     }
 
@@ -665,17 +836,22 @@ interface FileSearchResult {
     }
 
     /**
-     * Add a file as attachment
-     * @param file The file to add
+     * Add a file or folder as attachment
+     * @param file The file or folder to add
      * @param isTextReference True if added via #name syntax (should sync with text)
      */
     function addFileAttachment(file: FileSearchResult, isTextReference: boolean = false): void {
+        const isFolder = file.isFolder === true;
         const attachment: AttachmentInfo = {
-            id: `file_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+            id: `${isFolder ? 'folder' : 'file'}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+            // Note: substring(2, 8) extracts 6 chars starting at index 2, equivalent to deprecated substr(2, 6)
             name: file.name,
             uri: file.uri,
-            isImage: /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name),
-            isTextReference: isTextReference
+            isImage: !isFolder && /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name),
+            isTextReference: isTextReference,
+            isFolder: isFolder,
+            folderPath: isFolder ? file.path : undefined,
+            depth: isFolder ? -1 : undefined  // Default to recursive for autocomplete-added folders
         };
 
         currentAttachments.push(attachment);
@@ -933,6 +1109,11 @@ interface FileSearchResult {
         }
     });
 
+    // Clear history button handler
+    clearHistoryBtn?.addEventListener('click', () => {
+        vscode.postMessage({ type: 'clearHistory' });
+    });
+
     // Textarea input handler for # autocomplete trigger
     responseInput?.addEventListener('input', handleTextareaInput);
 
@@ -1008,6 +1189,14 @@ interface FileSearchResult {
             case 'showList':
                 showList(message.requests);
                 break;
+            case 'showHome':
+                recentInteractions = message.recentInteractions || [];
+                showHome();
+                // Also update pending requests if provided
+                if (message.pendingRequests) {
+                    showList(message.pendingRequests);
+                }
+                break;
             case 'updateAttachments':
                 if (message.requestId === currentRequestId) {
                     // Preserve flags from existing attachments when updating
@@ -1044,20 +1233,17 @@ interface FileSearchResult {
                 }
                 break;
             case 'clear':
-                showEmpty();
+                showHome();
                 hideAutocomplete();
                 break;
         }
     });
-}
 
-)();
+})();
 
 // Type declaration for VS Code API
 declare function acquireVsCodeApi(): {
     postMessage(message: unknown): void;
     getState(): unknown;
     setState(state: unknown): void;
-}
-
-    ;
+};

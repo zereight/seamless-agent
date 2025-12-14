@@ -60,4 +60,12 @@ export const strings = {
     get approvePlanReject() { return localize('approvePlan.button.reject'); },
     get approvePlanRemoveComment() { return localize('approvePlan.button.removeComment'); },
     get approvePlanSave() { return localize('approvePlan.button.save'); },
+    // Session History
+    get recentSessions() { return localize('session.recentSessions'); },
+    get sessionInteractions() { return localize('session.interactions'); },
+    get sessionInput() { return localize('session.input'); },
+    get sessionOutput() { return localize('session.output'); },
+    get noRecentSessions() { return localize('session.noRecent'); },
+    get clearHistory() { return localize('session.clearHistory'); },
+    get addFolder() { return localize('button.addFolder'); },
 };

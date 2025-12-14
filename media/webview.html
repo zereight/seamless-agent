@@ -13,8 +13,11 @@
 </head>
 
 <body>
+    <!-- Screen reader live region for announcing state changes -->
+    <div id="sr-announce" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
     <div class="container">
-        <!-- Header - only shown when viewing a request -->
+        <!-- Header - only shown when viewing a request or session detail -->
         <div id="request-header" class="request-header hidden">
             <button id="back-btn" class="btn-back" title="{{back}}">
                 <span class="codicon codicon-arrow-left"></span>
@@ -22,9 +25,38 @@
             <h2 id="header-title"></h2>
         </div>
 
-        <!-- Empty state - shown when no requests pending -->
-        <div id="empty-state">
-            <p class="placeholder">{{noPendingRequests}}</p>
+        <!-- Home View - shows pending requests and recent interactions -->
+        <div id="home-view">
+            <!-- Pending Requests Section -->
+            <div class="section" id="pending-section">
+                <h3 class="section-title">
+                    <span class="codicon codicon-checklist"></span>
+                    {{pendingRequests}}
+                </h3>
+                <div id="pending-requests-list">
+                    <p class="placeholder">{{noPendingRequests}}</p>
+                </div>
+            </div>
+
+            <!-- Divider -->
+            <hr class="section-divider">
+
+            <!-- Recent Interactions Section -->
+            <div class="section" id="interactions-section">
+                <div class="section-header">
+                    <h3 class="section-title">
+                        <span class="codicon codicon-history"></span>
+                        Recent Tool Calls
+                    </h3>
+                    <button id="clear-history-btn" class="btn-icon" title="{{clearHistory}}"
+                        aria-label="{{clearHistory}}">
+                        <span class="codicon codicon-trash"></span>
+                    </button>
+                </div>
+                <div id="recent-interactions-list">
+                    <p class="placeholder">{{noRecentSessions}}</p>
+                </div>
+            </div>
         </div>
 
         <!-- Request list - shown when multiple requests -->
@@ -108,7 +140,11 @@
             daysAgo: "{{daysAgo}}",
             selectFile: "{{selectFile}}",
             noFilesFound: "{{noFilesFound}}",
-            dropImageHere: "{{dropImageHere}}"
+            dropImageHere: "{{dropImageHere}}",
+            noPendingRequests: "{{noPendingRequests}}",
+            noRecentSessions: "{{noRecentSessions}}",
+            input: "{{sessionInput}}",
+            output: "{{sessionOutput}}"
         };
     </script>
     <script nonce="{{nonce}}" src="{{scriptUri}}"></script>

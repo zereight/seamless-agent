@@ -17,8 +17,6 @@ Uma ferramenta de Language Model que permite ao Copilot solicitar confirmação 
 - **Input Interativo** — Forneça contexto adicional ou instruções durante a conversa
 - **Validação de Tarefas** — Confirme se uma tarefa foi concluída conforme suas especificações
 - **Integração Seamless** — Funciona naturalmente dentro do fluxo do Copilot Chat
-- **Colar Imagens** — Cole imagens diretamente na área de entrada para contexto
-- **Referências e Anexos** — Referencie arquivos do seu workspace usando `#nomedoarquivo` e anexe arquivos à sua resposta
 
 ### Ferramenta Approve Plan (`#approvePlan`)
 

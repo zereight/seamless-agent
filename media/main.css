@@ -1,5 +1,18 @@
 /* Agent Console Webview Styles */
 
+/* Screen reader only - visually hidden but accessible */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 /* CSS Custom Properties for theming and maintenance */
 :root {
     --autocomplete-dropdown-max-height: 250px;
@@ -7,6 +20,7 @@
     --textarea-max-height: 200px;
     --chip-max-width: 200px;
     --chips-container-max-height: 120px;
+    --interaction-content-max-height: 200px;
 }
 
 html,
@@ -765,4 +779,329 @@ button:disabled {
 .drop-zone-content .codicon {
     font-size: 32px;
     color: var(--vscode-focusBorder);
+}
+
+/* ================================
+   Home View Styles
+   ================================ */
+
+#home-view {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
+#home-view .section {
+    flex-shrink: 0;
+}
+
+/* Override .section styles for interactions-section to make it scrollable */
+#home-view #interactions-section.section {
+    flex: 1;
+    flex-shrink: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+}
+
+#home-view #interactions-section .section-header {
+    flex-shrink: 0;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.section-divider {
+    border: none;
+    border-top: 1px solid var(--vscode-panel-border);
+    margin: 12px 0;
+}
+
+#home-view .section-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 0.95em;
+    margin-bottom: 8px;
+    color: var(--vscode-foreground);
+}
+
+#home-view .section-title .codicon {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+.btn-icon {
+    min-width: 24px;
+    height: 24px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: var(--vscode-descriptionForeground);
+    cursor: pointer;
+}
+
+.btn-icon:hover {
+    background-color: var(--vscode-toolbar-hoverBackground);
+    color: var(--vscode-foreground);
+}
+
+.btn-icon .codicon {
+    font-size: 14px;
+}
+
+#pending-requests-list,
+#recent-sessions-list,
+#recent-interactions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#recent-sessions-list,
+#recent-interactions-list {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    max-height: 100%;
+    padding-right: 4px;
+}
+
+/* Monaco-style scrollbar for sessions/interactions list */
+#recent-sessions-list::-webkit-scrollbar,
+#recent-interactions-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+#recent-sessions-list::-webkit-scrollbar-track,
+#recent-interactions-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#recent-sessions-list::-webkit-scrollbar-thumb,
+#recent-interactions-list::-webkit-scrollbar-thumb {
+    background-color: var(--vscode-scrollbarSlider-background);
+    border-radius: 4px;
+}
+
+#recent-sessions-list::-webkit-scrollbar-thumb:hover,
+#recent-interactions-list::-webkit-scrollbar-thumb:hover {
+    background-color: var(--vscode-scrollbarSlider-hoverBackground);
+}
+
+/* Interaction Item */
+.interaction-item {
+    margin-bottom: 8px;
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 6px;
+    overflow: hidden;
+    flex-shrink: 0;
+    /* Prevent items from compressing - force scroll instead */
+}
+
+.interaction-item:last-child {
+    margin-bottom: 0;
+}
+
+.interaction-header {
+    display: flex;
+    align-items: center;
+    padding: 6px 10px;
+    background-color: var(--vscode-editor-background);
+    border-bottom: 1px solid var(--vscode-input-border);
+    cursor: pointer;
+    user-select: none;
+}
+
+.interaction-header:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.interaction-header:focus-visible {
+    outline: 2px solid var(--vscode-focusBorder);
+    outline-offset: -2px;
+}
+
+.interaction-chevron {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    margin-right: 4px;
+}
+
+.interaction-chevron .codicon {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.interaction-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.interaction-icon .codicon {
+    font-size: 12px;
+}
+
+.interaction-item.completed .interaction-icon .codicon {
+    color: var(--vscode-testing-iconPassed, #73c991);
+}
+
+.interaction-item.cancelled .interaction-icon .codicon {
+    color: var(--vscode-testing-iconFailed, #f48771);
+}
+
+.interaction-title {
+    flex: 1;
+    font-weight: 500;
+    font-size: 0.85em;
+    color: var(--vscode-foreground);
+    margin-left: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Collapsed state - hide body */
+.interaction-item.collapsed .interaction-body {
+    display: none;
+}
+
+.interaction-item.collapsed .interaction-header {
+    border-bottom: none;
+}
+
+.interaction-time {
+    font-size: 0.75em;
+    color: var(--vscode-descriptionForeground);
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.interaction-body {
+    background-color: var(--vscode-input-background);
+}
+
+.interaction-section {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.interaction-section:last-child {
+    border-bottom: none;
+}
+
+.interaction-section-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7em;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--vscode-descriptionForeground);
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+}
+
+.interaction-section-label .codicon {
+    font-size: 11px;
+}
+
+.interaction-content {
+    font-size: 0.85em;
+    line-height: 1.4;
+    color: var(--vscode-foreground);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-height: var(--interaction-content-max-height);
+    overflow-y: auto;
+}
+
+/* Monaco-style scrollbar for interaction content */
+.interaction-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.interaction-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.interaction-content::-webkit-scrollbar-thumb {
+    background-color: var(--vscode-scrollbarSlider-background);
+    border-radius: 4px;
+}
+
+.interaction-content::-webkit-scrollbar-thumb:hover {
+    background-color: var(--vscode-scrollbarSlider-hoverBackground);
+}
+
+.interaction-content p {
+    margin: 0 0 4px 0;
+}
+
+.interaction-content p:last-child {
+    margin-bottom: 0;
+}
+
+.interaction-content pre {
+    margin: 4px 0;
+    padding: 8px;
+    background-color: var(--vscode-editor-background);
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: 0.9em;
+}
+
+/* Attachments in interaction */
+.interaction-attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.attachment-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background-color: var(--vscode-badge-background);
+    color: var(--vscode-badge-foreground);
+    border-radius: 12px;
+    font-size: 0.8em;
+}
+
+.attachment-chip .codicon {
+    font-size: 12px;
+}
+
+/* ================================
+   Folder Attachment Styles
+   ================================ */
+
+.chip-folder {
+    background-color: var(--vscode-editorWarning-background);
+}
+
+.chip-folder .codicon {
+    color: var(--vscode-editorWarning-foreground);
 }

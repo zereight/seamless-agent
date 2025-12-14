@@ -17,8 +17,6 @@ Uma ferramenta de Language Model que permite ao Copilot solicitar confirmação 
 - **Input Interativo** — Forneça contexto adicional ou instruções durante a conversa
 - **Validação de Tarefas** — Confirme se uma tarefa foi concluída conforme as suas especificações
 - **Integração Seamless** — Funciona naturalmente dentro do fluxo do Copilot Chat
-- **Colar Imagens** — Cole imagens diretamente na área de entrada para contexto
-- **Referências e Anexos** — Referencie ficheiros do seu workspace usando `#nomedoficheiro` e anexe ficheiros à sua resposta
 
 ### Ferramenta Approve Plan (`#approvePlan`)
 
@@ -76,7 +74,7 @@ Aguarde a minha aprovação (ou pedidos de ajuste). Só depois implemente o plan
 
 ## Requisitos
 
-- VS Code 1.106.1 ou superior
+- VS Code 1.104.1 ou superior
 - Extensão GitHub Copilot Chat
 
 ## Definições

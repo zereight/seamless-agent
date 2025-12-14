@@ -2,6 +2,13 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { strings } from '../localization';
+import {
+    ToolCallInteraction,
+    createInteraction,
+    trimInteractions,
+    serializeInteractions,
+    deserializeInteractions
+} from './sessionHistory';
 
 // Attachment info
 export interface AttachmentInfo {
@@ -9,6 +16,9 @@ export interface AttachmentInfo {
     name: string;
     uri: string;
     isTemporary?: boolean;  // True if this is a pasted/dropped image that should be cleaned up
+    isFolder?: boolean;     // True if this is a folder attachment
+    folderPath?: string;    // Full folder path for folder attachments
+    depth?: number;         // Folder depth (0=current, 1=1 level, 2=2 levels, -1=recursive)
 }
 
 // Request item for the list
@@ -24,6 +34,7 @@ export interface RequestItem {
 type ToWebviewMessage =
     | { type: 'showQuestion'; question: string; title: string; requestId: string }
     | { type: 'showList'; requests: RequestItem[] }
+    | { type: 'showHome'; pendingRequests: RequestItem[]; recentInteractions: ToolCallInteraction[] }
     | { type: 'updateAttachments'; requestId: string; attachments: AttachmentInfo[] }
     | { type: 'fileSearchResults'; files: FileSearchResult[] }
     | { type: 'imageSaved'; requestId: string; attachment: AttachmentInfo }
@@ -34,11 +45,14 @@ type FromWebviewMessage =
     | { type: 'cancel'; requestId: string }
     | { type: 'selectRequest'; requestId: string }
     | { type: 'backToList' }
+    | { type: 'backToHome' }
+    | { type: 'clearHistory' }
     | { type: 'addAttachment'; requestId: string }
     | { type: 'removeAttachment'; requestId: string; attachmentId: string }
     | { type: 'searchFiles'; query: string }
     | { type: 'saveImage'; requestId: string; data: string; mimeType: string }
-    | { type: 'addFileReference'; requestId: string; file: FileSearchResult };
+    | { type: 'addFileReference'; requestId: string; file: FileSearchResult }
+    | { type: 'addFolderAttachment'; requestId: string };
 
 // File search result for autocomplete
 export interface FileSearchResult {
@@ -46,6 +60,7 @@ export interface FileSearchResult {
     path: string;
     uri: string;
     icon: string;
+    isFolder?: boolean;  // True if this is a folder result
 }
 
 // Result type for user responses
@@ -69,7 +84,83 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
     // Currently selected request
     private _selectedRequestId: string | null = null;
 
-    constructor(private readonly _extensionUri: vscode.Uri) { }
+    // Interaction history
+    private _recentInteractions: ToolCallInteraction[] = [];
+
+    constructor(private readonly _context: vscode.ExtensionContext) { }
+
+    private get _extensionUri(): vscode.Uri {
+        return this._context.extensionUri;
+    }
+
+    /**
+     * Load interaction history from disk (using VS Code global storage)
+     */
+    public loadSessionsFromDisk(): void {
+        try {
+            const storagePath = this._context.globalStorageUri.fsPath;
+            const historyPath = path.join(storagePath, 'history.json');
+
+            if (fs.existsSync(historyPath)) {
+                const data = fs.readFileSync(historyPath, 'utf8');
+                this._recentInteractions = deserializeInteractions(data);
+                console.log(`Loaded ${this._recentInteractions.length} interactions from extension storage`);
+            }
+        } catch (error) {
+            console.error('Failed to load interactions from extension storage:', error);
+        }
+    }
+
+    /**
+     * Save interaction history to disk (using VS Code global storage)
+     */
+    public saveSessionsToDisk(): void {
+        try {
+            const storagePath = this._context.globalStorageUri.fsPath;
+            const historyPath = path.join(storagePath, 'history.json');
+
+            // Ensure directory exists
+            if (!fs.existsSync(storagePath)) {
+                fs.mkdirSync(storagePath, { recursive: true });
+            }
+
+            const data = serializeInteractions(this._recentInteractions);
+            fs.writeFileSync(historyPath, data, 'utf8');
+            console.log(`Saved ${this._recentInteractions.length} interactions to extension storage`);
+        } catch (error) {
+            console.error('Failed to save interactions to extension storage:', error);
+        }
+    }
+
+    /**
+     * Add an interaction to the history
+     */
+    private _addInteraction(interaction: ToolCallInteraction): void {
+        // Add to recent interactions at the beginning (newest first)
+        this._recentInteractions.unshift(interaction);
+
+        // Trim to max interactions
+        this._recentInteractions = trimInteractions(this._recentInteractions);
+
+        // Save to disk
+        this.saveSessionsToDisk();
+    }
+
+    /**
+     * Get all recent interactions
+     */
+    public getRecentSessions(): ToolCallInteraction[] {
+        return [...this._recentInteractions];
+    }
+
+    /**
+     * Clear all interaction history
+     */
+    public clearHistory(): void {
+        this._recentInteractions = [];
+        this.saveSessionsToDisk();
+        this._showHome();
+    }
 
     resolveWebviewView(
         webviewView: vscode.WebviewView,
@@ -98,20 +189,11 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
             []
         );
 
-        // Restore pending requests view if there are any
-        // This ensures that if the webview is closed and reopened, the requests still appear
+        // Always show home view first (which includes pending requests and recent sessions)
+        this._showHome();
+
+        // Update badge count
         if (this._pendingRequests.size > 0) {
-            if (this._pendingRequests.size === 1 && this._selectedRequestId) {
-                // Show the single selected question
-                const pending = this._pendingRequests.get(this._selectedRequestId);
-                if (pending) {
-                    this._showQuestion(pending.item);
-                }
-            } else {
-                // Show the list of pending requests
-                this._showList();
-            }
-            // Update badge count
             this._setBadge(this._pendingRequests.size);
         }
     }
@@ -243,6 +325,20 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
     }
 
     /**
+     * Show the home view with pending requests and recent interactions
+     */
+    private _showHome(): void {
+        const pendingRequests = Array.from(this._pendingRequests.values()).map(p => p.item);
+
+        const message: ToWebviewMessage = {
+            type: 'showHome',
+            pendingRequests,
+            recentInteractions: this._recentInteractions
+        };
+        this._view?.webview.postMessage(message);
+    }
+
+    /**
      * Clear the current question from the webview
      */
     public clear(): void {
@@ -280,8 +376,18 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
                 this._selectedRequestId = null;
                 this._showList();
                 break;
+            case 'backToHome':
+                this._selectedRequestId = null;
+                this._showHome();
+                break;
+            case 'clearHistory':
+                this.clearHistory();
+                break;
             case 'addAttachment':
                 this._handleAddAttachment(message.requestId);
+                break;
+            case 'addFolderAttachment':
+                this._handleAddFolderAttachment(message.requestId);
                 break;
             case 'removeAttachment':
                 this._handleRemoveAttachment(message.requestId, message.attachmentId);
@@ -372,6 +478,107 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
     }
 
     /**
+     * Handle adding a folder attachment via VS Code's folder picker
+     */
+    private async _handleAddFolderAttachment(requestId: string): Promise<void> {
+        const pending = this._pendingRequests.get(requestId);
+        if (!pending) return;
+
+        // Get workspace folders
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+            vscode.window.showInformationMessage('No workspace folder found');
+            return;
+        }
+
+        // Find all folders in the workspace
+        const folderItems: (vscode.QuickPickItem & { uri: vscode.Uri })[] = [];
+
+        // Add workspace root folders
+        for (const folder of workspaceFolders) {
+            folderItems.push({
+                label: `$(folder) ${folder.name}`,
+                description: folder.uri.fsPath,
+                uri: folder.uri
+            });
+        }
+
+        // Find subdirectories
+        try {
+            const allFiles = await vscode.workspace.findFiles('**/*', '**/node_modules/**', 5000);
+            const seenDirs = new Set<string>();
+
+            for (const fileUri of allFiles) {
+                const dirPath = path.dirname(fileUri.fsPath);
+                if (!seenDirs.has(dirPath)) {
+                    seenDirs.add(dirPath);
+                    const relativePath = vscode.workspace.asRelativePath(dirPath);
+                    const folderName = path.basename(dirPath);
+
+                    // Skip root workspace folders (already added)
+                    const isWorkspaceRoot = workspaceFolders.some(
+                        wf => wf.uri.fsPath === dirPath
+                    );
+                    if (!isWorkspaceRoot) {
+                        folderItems.push({
+                            label: `$(folder) ${folderName}`,
+                            description: relativePath,
+                            uri: vscode.Uri.file(dirPath)
+                        });
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error finding folders:', error);
+        }
+
+        // Sort by label
+        folderItems.sort((a, b) => a.label.localeCompare(b.label));
+
+        // Show quick pick for folder selection
+        const selectedFolder = await vscode.window.showQuickPick(folderItems, {
+            placeHolder: 'Select a folder to attach',
+            matchOnDescription: true
+        });
+
+        if (!selectedFolder) return;
+
+        // Ask for folder depth
+        const depthOptions = [
+            { label: 'Current level only', depth: 0 },
+            { label: '1 level deep', depth: 1 },
+            { label: '2 levels deep', depth: 2 },
+            { label: 'All files (recursive)', depth: -1 }
+        ];
+
+        const selectedDepth = await vscode.window.showQuickPick(depthOptions, {
+            placeHolder: 'Select folder depth to include'
+        });
+
+        if (!selectedDepth) return;
+
+        // Create folder attachment
+        const folderName = path.basename(selectedFolder.uri.fsPath);
+        const attachment: AttachmentInfo = {
+            id: `folder_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+            name: folderName,
+            uri: selectedFolder.uri.toString(),
+            isFolder: true,
+            folderPath: selectedFolder.uri.fsPath,
+            depth: selectedDepth.depth
+        };
+
+        pending.item.attachments.push(attachment);
+
+        // Update webview with new attachments
+        this._view?.webview.postMessage({
+            type: 'updateAttachments',
+            requestId,
+            attachments: pending.item.attachments
+        });
+    }
+
+    /**
      * Handle file search for autocomplete dropdown
      */
     private async _handleSearchFiles(query: string): Promise<void> {
@@ -384,7 +591,44 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
             const allFiles = await vscode.workspace.findFiles('**/*', '**/node_modules/**', 2000);
             const queryLower = sanitizedQuery.toLowerCase();
 
-            const results: FileSearchResult[] = allFiles
+            // Extract unique folders from file paths
+            const seenFolders = new Set<string>();
+            const folderResults: FileSearchResult[] = [];
+
+            for (const uri of allFiles) {
+                const relativePath = vscode.workspace.asRelativePath(uri);
+                const parts = relativePath.split(/[\\/]/);
+
+                // Build folder paths progressively (e.g., 'src', 'src/components', 'src/components/ui')
+                let currentPath = '';
+                for (let i = 0; i < parts.length - 1; i++) { // -1 to exclude the filename
+                    currentPath = currentPath ? `${currentPath}/${parts[i]}` : parts[i];
+
+                    if (!seenFolders.has(currentPath)) {
+                        seenFolders.add(currentPath);
+                        const folderName = parts[i];
+
+                        // Only add if matches query (or query is empty)
+                        if (!queryLower ||
+                            folderName.toLowerCase().includes(queryLower) ||
+                            currentPath.toLowerCase().includes(queryLower)) {
+                            folderResults.push({
+                                name: folderName,
+                                path: currentPath,
+                                uri: vscode.Uri.joinPath(
+                                    vscode.workspace.workspaceFolders![0].uri,
+                                    currentPath
+                                ).toString(),
+                                icon: 'folder',
+                                isFolder: true
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Map files to results
+            const fileResults: FileSearchResult[] = allFiles
                 .map(uri => {
                     const relativePath = vscode.workspace.asRelativePath(uri);
                     const fileName = uri.fsPath.split(/[\\/]/).pop() || 'file';
@@ -392,7 +636,8 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
                         name: fileName,
                         path: relativePath,
                         uri: uri.toString(),
-                        icon: this._getFileIcon(fileName)
+                        icon: this._getFileIcon(fileName),
+                        isFolder: false
                     };
                 })
                 // Case-insensitive filtering on both filename and path
@@ -401,15 +646,22 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
                     !queryLower ||
                     file.name.toLowerCase().includes(queryLower) ||
                     file.path.toLowerCase().includes(queryLower)
-                )
+                );
+
+            // Combine folders and files, then sort
+            const allResults = [...folderResults, ...fileResults]
                 .sort((a, b) => {
-                    // Prioritize exact name matches (starts with query)
+                    // Prioritize folders over files
+                    if (a.isFolder && !b.isFolder) return -1;
+                    if (!a.isFolder && b.isFolder) return 1;
+
+                    // Then prioritize exact name matches (starts with query)
                     const aExact = a.name.toLowerCase().startsWith(queryLower);
                     const bExact = b.name.toLowerCase().startsWith(queryLower);
                     if (aExact && !bExact) return -1;
                     if (!aExact && bExact) return 1;
 
-                    // Secondary: prioritize filename contains over path-only matches
+                    // Secondary: prioritize name contains over path-only matches
                     const aNameMatch = a.name.toLowerCase().includes(queryLower);
                     const bNameMatch = b.name.toLowerCase().includes(queryLower);
                     if (aNameMatch && !bNameMatch) return -1;
@@ -421,7 +673,7 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
 
             this._view?.webview.postMessage({
                 type: 'fileSearchResults',
-                files: results
+                files: allResults
             });
         } catch (error) {
             console.error('File search error:', error);
@@ -433,17 +685,22 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
     }
 
     /**
-     * Handle adding a file reference from autocomplete selection
+     * Handle adding a file or folder reference from autocomplete selection
      */
     private _handleAddFileReference(requestId: string, file: FileSearchResult): void {
         const pending = this._pendingRequests.get(requestId);
         if (!pending || !file) return;
 
-        // Create attachment from file reference
+        const isFolder = file.isFolder === true;
+
+        // Create attachment from file/folder reference
         const attachment: AttachmentInfo = {
-            id: `file_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+            id: `${isFolder ? 'folder' : 'file'}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
             name: file.name,
-            uri: file.uri
+            uri: file.uri,
+            isFolder: isFolder,
+            folderPath: isFolder ? file.path : undefined,
+            depth: isFolder ? -1 : undefined  // Default to recursive for autocomplete-added folders
         };
 
         // Add to pending request attachments
@@ -504,14 +761,13 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
             };
             const ext = extMap[mimeType] || '.png';
 
-            // Get temp directory - use workspace .seamless-agent folder or system temp
-            let tempDir: string;
-            const workspaceFolders = vscode.workspace.workspaceFolders;
-            if (workspaceFolders && workspaceFolders.length > 0) {
-                tempDir = path.join(workspaceFolders[0].uri.fsPath, '.seamless-agent');
-            } else {
-                tempDir = path.join(require('os').tmpdir(), 'seamless-agent');
+            // Use VS Code storage for temp images
+            const storageUri = this._context.storageUri;
+            if (!storageUri) {
+                throw new Error('Storage URI not available');
             }
+
+            const tempDir = path.join(storageUri.fsPath, 'temp-images');
 
             // Ensure temp directory exists
             if (!fs.existsSync(tempDir)) {
@@ -579,20 +835,42 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
     private _resolveRequest(requestId: string, result: UserResponseResult): void {
         const pending = this._pendingRequests.get(requestId);
         if (pending) {
+            // Create interaction record and add to history (keeps full attachment info)
+            const interaction = createInteraction(
+                requestId,
+                pending.item.question,
+                pending.item.title,
+                result.response,
+                result.attachments,
+                result.responded ? 'completed' : 'cancelled'
+            );
+            this._addInteraction(interaction);
+
             // Clean up temporary image files (pasted/dropped images)
             this._cleanupTempAttachments(pending.item.attachments);
 
-            pending.resolve(result);
+            // Strip internal fields from attachments before returning to MCP caller
+            // LLM only needs name and uri to access the content
+            const cleanResult: UserResponseResult = {
+                responded: result.responded,
+                response: result.response,
+                attachments: result.attachments.map(att => ({
+                    name: att.name,
+                    uri: att.uri
+                })) as AttachmentInfo[]
+            };
+
+            pending.resolve(cleanResult);
             this._pendingRequests.delete(requestId);
 
             // Update badge
             this._setBadge(this._pendingRequests.size);
 
-            // If there are still pending requests, show the list
+            // Show home view (pending requests + history)
             if (this._pendingRequests.size > 0) {
                 this._showList();
             } else {
-                this.clear();
+                this._showHome();
             }
         }
     }
@@ -624,30 +902,30 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
     }
 
     /**
-     * Cleanup all temp files in the .seamless-agent directory
+     * Cleanup all temp files in the extension storage directory
      * Called during extension deactivation to prevent orphaned files
      */
     public cleanupAllTempFiles(): void {
         try {
-            const workspaceFolders = vscode.workspace.workspaceFolders;
-            if (workspaceFolders && workspaceFolders.length > 0) {
-                const tempDir = path.join(workspaceFolders[0].uri.fsPath, '.seamless-agent');
-                if (fs.existsSync(tempDir)) {
-                    const files = fs.readdirSync(tempDir);
-                    for (const file of files) {
-                        try {
-                            const filePath = path.join(tempDir, file);
-                            fs.unlinkSync(filePath);
-                            console.log(`Cleaned up orphaned temp file: ${filePath}`);
-                        } catch (err) {
-                            console.error(`Failed to clean up ${file}:`, err);
-                        }
+            const storageUri = this._context.storageUri;
+            if (!storageUri) return;
+
+            const tempDir = path.join(storageUri.fsPath, 'temp-images');
+            if (fs.existsSync(tempDir)) {
+                const files = fs.readdirSync(tempDir);
+                for (const file of files) {
+                    try {
+                        const filePath = path.join(tempDir, file);
+                        fs.unlinkSync(filePath);
+                        console.log(`Cleaned up orphaned temp file: ${filePath}`);
+                    } catch (err) {
+                        console.error(`Failed to clean up ${file}:`, err);
                     }
-                    // Remove the directory if empty
-                    const remainingFiles = fs.readdirSync(tempDir);
-                    if (remainingFiles.length === 0) {
-                        fs.rmdirSync(tempDir);
-                    }
+                }
+                // Remove the directory if empty
+                const remainingFiles = fs.readdirSync(tempDir);
+                if (remainingFiles.length === 0) {
+                    fs.rmdirSync(tempDir);
                 }
             }
         } catch (error) {
@@ -735,7 +1013,14 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
             '{{daysAgo}}': strings.daysAgo,
             '{{selectFile}}': strings.selectFile,
             '{{noFilesFound}}': strings.noFilesFound,
-            '{{dropImageHere}}': strings.dropImageHere
+            '{{dropImageHere}}': strings.dropImageHere,
+            // Session history strings
+            '{{recentSessions}}': strings.recentSessions,
+            '{{noRecentSessions}}': strings.noRecentSessions,
+            '{{clearHistory}}': strings.clearHistory,
+            '{{sessionInput}}': strings.sessionInput,
+            '{{sessionOutput}}': strings.sessionOutput,
+            '{{addFolder}}': strings.addFolder
         };
 
         for (const [placeholder, value] of Object.entries(replacements)) {
