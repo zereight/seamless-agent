@@ -87,6 +87,22 @@ None at this time. Please report issues on [GitHub](https://github.com/jraylan/s
 
 ## Release Notes
 
+### 0.1.9
+
+#### Added
+
+- **File Reference Autocomplete**: Type `#` in the response textarea to search and reference workspace files. Selected files are automatically attached and synced with your text.
+- **Attachment Chips**: File attachments are now displayed as visual chips above the textarea for easy management.
+- **Paste Images**: Paste images directly into the input area to attach them.
+- **Attach Button**: New 📎 button to quickly add file attachments via file picker.
+
+#### Changed
+
+- **Inline Image Support**: Images pasted in the `ask_user` tool are now passed directly to the AI using `LanguageModelDataPart.image()` binary data, eliminating the need for a separate image viewing tool.
+- **Simplified Attachments**: Attachments response format simplified to a string array of file URIs.
+- **Simplified Image Naming**: Pasted images now use simple names (`image-pasted.png`, `image-pasted-1.png`) instead of long timestamps.
+- **Simplified File References**: File references now use `#filename` format instead of `#file:filename`.
+
 ### 0.1.8
 
 #### Added

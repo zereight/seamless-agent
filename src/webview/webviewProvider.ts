@@ -8,6 +8,7 @@ export interface AttachmentInfo {
     id: string;
     name: string;
     uri: string;
+    isTemporary?: boolean;  // True if this is a pasted/dropped image that should be cleaned up
 }
 
 // Request item for the list
@@ -24,6 +25,8 @@ type ToWebviewMessage =
     | { type: 'showQuestion'; question: string; title: string; requestId: string }
     | { type: 'showList'; requests: RequestItem[] }
     | { type: 'updateAttachments'; requestId: string; attachments: AttachmentInfo[] }
+    | { type: 'fileSearchResults'; files: FileSearchResult[] }
+    | { type: 'imageSaved'; requestId: string; attachment: AttachmentInfo }
     | { type: 'clear' };
 
 type FromWebviewMessage =
@@ -32,7 +35,18 @@ type FromWebviewMessage =
     | { type: 'selectRequest'; requestId: string }
     | { type: 'backToList' }
     | { type: 'addAttachment'; requestId: string }
-    | { type: 'removeAttachment'; requestId: string; attachmentId: string };
+    | { type: 'removeAttachment'; requestId: string; attachmentId: string }
+    | { type: 'searchFiles'; query: string }
+    | { type: 'saveImage'; requestId: string; data: string; mimeType: string }
+    | { type: 'addFileReference'; requestId: string; file: FileSearchResult };
+
+// File search result for autocomplete
+export interface FileSearchResult {
+    name: string;
+    path: string;
+    uri: string;
+    icon: string;
+}
 
 // Result type for user responses
 export interface UserResponseResult {
@@ -272,6 +286,15 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
             case 'removeAttachment':
                 this._handleRemoveAttachment(message.requestId, message.attachmentId);
                 break;
+            case 'searchFiles':
+                this._handleSearchFiles(message.query);
+                break;
+            case 'saveImage':
+                this._handleSaveImage(message.requestId, message.data, message.mimeType);
+                break;
+            case 'addFileReference':
+                this._handleAddFileReference(message.requestId, message.file);
+                break;
         }
     }
 
@@ -349,11 +372,194 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
     }
 
     /**
+     * Handle file search for autocomplete dropdown
+     */
+    private async _handleSearchFiles(query: string): Promise<void> {
+        try {
+            // Fetch all workspace files first, then filter case-insensitively
+            // This ensures queries like 'readme' match 'README.md'
+            const allFiles = await vscode.workspace.findFiles('**/*', '**/node_modules/**', 2000);
+            const queryLower = (query || '').toLowerCase();
+
+            const results: FileSearchResult[] = allFiles
+                .map(uri => {
+                    const relativePath = vscode.workspace.asRelativePath(uri);
+                    const fileName = uri.fsPath.split(/[\\/]/).pop() || 'file';
+                    return {
+                        name: fileName,
+                        path: relativePath,
+                        uri: uri.toString(),
+                        icon: this._getFileIcon(fileName)
+                    };
+                })
+                // Case-insensitive filtering on both filename and path
+                // If query is empty, show all files
+                .filter(file =>
+                    !queryLower ||
+                    file.name.toLowerCase().includes(queryLower) ||
+                    file.path.toLowerCase().includes(queryLower)
+                )
+                .sort((a, b) => {
+                    // Prioritize exact name matches (starts with query)
+                    const aExact = a.name.toLowerCase().startsWith(queryLower);
+                    const bExact = b.name.toLowerCase().startsWith(queryLower);
+                    if (aExact && !bExact) return -1;
+                    if (!aExact && bExact) return 1;
+
+                    // Secondary: prioritize filename contains over path-only matches
+                    const aNameMatch = a.name.toLowerCase().includes(queryLower);
+                    const bNameMatch = b.name.toLowerCase().includes(queryLower);
+                    if (aNameMatch && !bNameMatch) return -1;
+                    if (!aNameMatch && bNameMatch) return 1;
+
+                    return a.name.localeCompare(b.name);
+                })
+                .slice(0, 50); // Limit to 50 results
+
+            this._view?.webview.postMessage({
+                type: 'fileSearchResults',
+                files: results
+            });
+        } catch (error) {
+            console.error('File search error:', error);
+            this._view?.webview.postMessage({
+                type: 'fileSearchResults',
+                files: []
+            });
+        }
+    }
+
+    /**
+     * Handle adding a file reference from autocomplete selection
+     */
+    private _handleAddFileReference(requestId: string, file: FileSearchResult): void {
+        const pending = this._pendingRequests.get(requestId);
+        if (!pending || !file) return;
+
+        // Create attachment from file reference
+        const attachment: AttachmentInfo = {
+            id: `file_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+            name: file.name,
+            uri: file.uri
+        };
+
+        // Add to pending request attachments
+        pending.item.attachments.push(attachment);
+
+        // Send updated attachments to webview
+        this._view?.webview.postMessage({
+            type: 'updateAttachments',
+            requestId,
+            attachments: pending.item.attachments
+        });
+    }
+
+    /**
+     * Handle saving an image from paste/drop to temp location
+     */
+    private async _handleSaveImage(requestId: string, dataUrl: string, mimeType: string): Promise<void> {
+        const pending = this._pendingRequests.get(requestId);
+        if (!pending) return;
+
+        try {
+            // Extract base64 data from data URL
+            const base64Match = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
+            if (!base64Match) {
+                console.error('Invalid data URL format');
+                return;
+            }
+
+            const base64Data = base64Match[1];
+            const buffer = Buffer.from(base64Data, 'base64');
+
+            // Determine file extension from MIME type
+            const extMap: Record<string, string> = {
+                'image/png': '.png',
+                'image/jpeg': '.jpg',
+                'image/gif': '.gif',
+                'image/webp': '.webp',
+                'image/bmp': '.bmp',
+                'image/svg+xml': '.svg'
+            };
+            const ext = extMap[mimeType] || '.png';
+
+            // Get temp directory - use workspace .seamless-agent folder or system temp
+            let tempDir: string;
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (workspaceFolders && workspaceFolders.length > 0) {
+                tempDir = path.join(workspaceFolders[0].uri.fsPath, '.seamless-agent');
+            } else {
+                tempDir = path.join(require('os').tmpdir(), 'seamless-agent');
+            }
+
+            // Ensure temp directory exists
+            if (!fs.existsSync(tempDir)) {
+                fs.mkdirSync(tempDir, { recursive: true });
+            }
+
+            // Generate simple incremental filename: image-pasted.png, image-pasted-1.png, etc.
+            let fileName: string;
+            let filePath: string;
+            const existingImages = pending.item.attachments.filter(a => a.isTemporary).length;
+
+            if (existingImages === 0) {
+                fileName = `image-pasted${ext}`;
+            } else {
+                fileName = `image-pasted-${existingImages}${ext}`;
+            }
+            filePath = path.join(tempDir, fileName);
+
+            // Handle filename collision (if same name exists from previous request)
+            let counter = existingImages;
+            while (fs.existsSync(filePath)) {
+                counter++;
+                fileName = `image-pasted-${counter}${ext}`;
+                filePath = path.join(tempDir, fileName);
+            }
+
+            // Write file
+            fs.writeFileSync(filePath, buffer);
+
+            // Create attachment info
+            const attachment: AttachmentInfo = {
+                id: `img_${Date.now()}`,
+                name: fileName,
+                uri: vscode.Uri.file(filePath).toString(),
+                isTemporary: true  // Mark for cleanup after request resolution
+            };
+
+            // Add to pending request attachments
+            pending.item.attachments.push(attachment);
+
+            // Notify webview
+            this._view?.webview.postMessage({
+                type: 'imageSaved',
+                requestId,
+                attachment
+            });
+
+            // Also send updated attachments list
+            this._view?.webview.postMessage({
+                type: 'updateAttachments',
+                requestId,
+                attachments: pending.item.attachments
+            });
+
+        } catch (error) {
+            console.error('Failed to save image:', error);
+            vscode.window.showErrorMessage('Failed to save pasted image');
+        }
+    }
+
+    /**
      * Resolve a specific request and clean up
      */
     private _resolveRequest(requestId: string, result: UserResponseResult): void {
         const pending = this._pendingRequests.get(requestId);
         if (pending) {
+            // Clean up temporary image files (pasted/dropped images)
+            this._cleanupTempAttachments(pending.item.attachments);
+
             pending.resolve(result);
             this._pendingRequests.delete(requestId);
 
@@ -367,6 +573,28 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
                 this.clear();
             }
         }
+    }
+
+    /**
+     * Clean up temporary attachment files (pasted/dropped images)
+     * Delay cleanup to allow LLM to read the files first
+     */
+    private _cleanupTempAttachments(attachments: AttachmentInfo[]): void {
+        // Delay cleanup by 30 seconds to allow LLM to read the image data
+        setTimeout(() => {
+            for (const att of attachments) {
+                if (att.isTemporary && att.uri) {
+                    try {
+                        const filePath = vscode.Uri.parse(att.uri).fsPath;
+                        if (fs.existsSync(filePath)) {
+                            fs.unlinkSync(filePath);
+                        }
+                    } catch (error) {
+                        console.error('Failed to cleanup temp attachment:', error);
+                    }
+                }
+            }
+        }, 30000); // 30 second delay
     }
 
     /**
@@ -446,7 +674,10 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
             '{{justNow}}': strings.justNow,
             '{{minutesAgo}}': strings.minutesAgo,
             '{{hoursAgo}}': strings.hoursAgo,
-            '{{daysAgo}}': strings.daysAgo
+            '{{daysAgo}}': strings.daysAgo,
+            '{{selectFile}}': strings.selectFile,
+            '{{noFilesFound}}': strings.noFilesFound,
+            '{{dropImageHere}}': strings.dropImageHere
         };
 
         for (const [placeholder, value] of Object.entries(replacements)) {

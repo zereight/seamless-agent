@@ -87,6 +87,22 @@ Nenhum até o momento. Por favor, reporte problemas no [GitHub](https://github.c
 
 ## Notas de Versão
 
+### 0.1.9
+
+#### Adicionado
+
+- **Autocompletar Referência de Arquivos**: Digite `#` na área de resposta para buscar e referenciar arquivos do workspace. Arquivos selecionados são automaticamente anexados e sincronizados com seu texto.
+- **Chips de Anexos**: Anexos de arquivos agora são exibidos como chips visuais acima da área de texto para fácil gerenciamento.
+- **Colar Imagens**: Cole imagens diretamente na área de entrada para anexá-las.
+- **Botão de Anexar**: Novo botão 📎 para adicionar anexos de arquivos rapidamente via seletor de arquivos.
+
+#### Alterado
+
+- **Suporte a Imagens Inline**: Imagens coladas na ferramenta `ask_user` agora são passadas diretamente para a IA usando dados binários `LanguageModelDataPart.image()`, eliminando a necessidade de uma ferramenta separada de visualização de imagens.
+- **Anexos Simplificados**: Formato de resposta de anexos simplificado para um array de strings de URIs de arquivos.
+- **Nomenclatura de Imagens Simplificada**: Imagens coladas agora usam nomes simples (`image-pasted.png`, `image-pasted-1.png`) em vez de timestamps longos.
+- **Referências de Arquivos Simplificadas**: Referências de arquivos agora usam formato `#nomedoarquivo` em vez de `#file:nomedoarquivo`.
+
 ### 0.1.8
 
 #### Adicionado

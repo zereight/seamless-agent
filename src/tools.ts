@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { strings } from './localization';
 import { AgentInteractionProvider, AttachmentInfo, UserResponseResult } from './webview/webviewProvider';
 import { ApprovePlanPanel, ApprovePlanResult, PlanComment } from './webview/approvePlanPanel';
@@ -19,16 +21,41 @@ export interface ApprovePlanInput {
 export interface AskUserToolResult {
     responded: boolean;
     response: string;
-    attachments: Array<{
-        name: string;
-        uri: string;
-    }>;
+    attachments: string[];  // Array of file URIs
 }
 
 // Result structure for approve_plan tool
 export interface ApprovePlanToolResult {
     approved: boolean;
     comments: PlanComment[];
+}
+
+/**
+ * Reads a file as Uint8Array for efficient binary handling
+ */
+async function readFileAsBuffer(filePath: string): Promise<Uint8Array> {
+    const buffer = await fs.promises.readFile(filePath);
+    return new Uint8Array(buffer);
+}
+
+/**
+ * Gets the MIME type for an image file based on its extension
+ */
+function getImageMimeType(filePath: string): string {
+    const extension = path.extname(filePath).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.bmp': 'image/bmp',
+        '.svg': 'image/svg+xml',
+        '.ico': 'image/x-icon',
+        '.tiff': 'image/tiff',
+        '.tif': 'image/tiff',
+    };
+    return mimeTypes[extension] || 'application/octet-stream';
 }
 
 /**
@@ -44,10 +71,32 @@ export function registerNativeTools(context: vscode.ExtensionContext, provider: 
             // Build result with attachments
             const result = await askUser(params, provider, token);
 
-            // Return result to the AI
-            return new vscode.LanguageModelToolResult([
+            // Build the result parts - text first, then any image attachments
+            const resultParts: (vscode.LanguageModelTextPart | vscode.LanguageModelDataPart)[] = [
                 new vscode.LanguageModelTextPart(JSON.stringify(result))
-            ]);
+            ];
+
+            // Add image attachments as LanguageModelDataPart for vision models
+            if (result.attachments && result.attachments.length > 0) {
+                for (const uri of result.attachments) {
+                    try {
+                        const fileUri = vscode.Uri.parse(uri);
+                        const filePath = fileUri.fsPath;
+                        const mimeType = getImageMimeType(filePath);
+
+                        // Only process image files
+                        if (mimeType !== 'application/octet-stream') {
+                            const data = await readFileAsBuffer(filePath);
+                            resultParts.push(vscode.LanguageModelDataPart.image(data, mimeType));
+                        }
+                    } catch (error) {
+                        console.error('Failed to read image attachment:', error);
+                    }
+                }
+            }
+
+            // Return result to the AI with both text and image parts
+            return new vscode.LanguageModelToolResult(resultParts);
         }
     });
 
@@ -97,10 +146,7 @@ export async function askUser(
         return {
             responded: result.responded,
             response: result.responded ? result.response : 'Request was cancelled',
-            attachments: result.attachments.map(att => ({
-                name: att.name,
-                uri: att.uri
-            }))
+            attachments: result.attachments.map(att => att.uri)
         };
     } finally {
         // Clean up cancellation listener
