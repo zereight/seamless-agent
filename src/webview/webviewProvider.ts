@@ -591,38 +591,35 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
             const allFiles = await vscode.workspace.findFiles('**/*', '**/node_modules/**', 2000);
             const queryLower = sanitizedQuery.toLowerCase();
 
-            // Extract unique folders from file paths
+            // Extract unique folders from file paths (optimized)
             const seenFolders = new Set<string>();
             const folderResults: FileSearchResult[] = [];
 
             for (const uri of allFiles) {
                 const relativePath = vscode.workspace.asRelativePath(uri);
-                const parts = relativePath.split(/[\\/]/);
+                const dirPath = path.dirname(relativePath);
 
-                // Build folder paths progressively (e.g., 'src', 'src/components', 'src/components/ui')
-                let currentPath = '';
-                for (let i = 0; i < parts.length - 1; i++) { // -1 to exclude the filename
-                    currentPath = currentPath ? `${currentPath}/${parts[i]}` : parts[i];
+                if (dirPath && dirPath !== '.' && !seenFolders.has(dirPath)) {
+                    seenFolders.add(dirPath);
+                    const parts = dirPath.split(/[\\/]/);
+                    const folderName = parts[parts.length - 1];
 
-                    if (!seenFolders.has(currentPath)) {
-                        seenFolders.add(currentPath);
-                        const folderName = parts[i];
-
-                        // Only add if matches query (or query is empty)
-                        if (!queryLower ||
-                            folderName.toLowerCase().includes(queryLower) ||
-                            currentPath.toLowerCase().includes(queryLower)) {
-                            folderResults.push({
-                                name: folderName,
-                                path: currentPath,
-                                uri: vscode.Uri.joinPath(
-                                    vscode.workspace.workspaceFolders![0].uri,
-                                    currentPath
-                                ).toString(),
-                                icon: 'folder',
-                                isFolder: true
-                            });
-                        }
+                    // Only add if matches query (or query is empty)
+                    if (!queryLower ||
+                        folderName.toLowerCase().includes(queryLower) ||
+                        dirPath.toLowerCase().includes(queryLower)) {
+                        // Use correct workspace folder for multi-root workspaces
+                        const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri)?.uri ?? vscode.workspace.workspaceFolders![0].uri;
+                        folderResults.push({
+                            name: folderName,
+                            path: dirPath,
+                            uri: vscode.Uri.joinPath(
+                                workspaceFolder,
+                                dirPath
+                            ).toString(),
+                            icon: 'folder',
+                            isFolder: true
+                        });
                     }
                 }
             }

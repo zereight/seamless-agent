@@ -331,9 +331,6 @@ interface ToolCallInteraction {
     }
 
     /**
-     * Render the recent interactions list
-     */
-    /**
      * Extract a meaningful title from the LLM's input question
      * Uses the first sentence (up to ~80 chars) as the title
      */
@@ -380,7 +377,7 @@ interface ToolCallInteraction {
             const chevronIcon = isExpanded ? 'chevron-down' : 'chevron-right';
 
             return `
-                <div class="interaction-item ${statusClass} ${collapsedClass}" data-interaction-id="${interaction.id}">
+                <div class="interaction-item ${statusClass} ${collapsedClass}" data-interaction-id="${escapeHtml(interaction.id)}">
                     <div class="interaction-header" role="button" tabindex="0" aria-expanded="${isExpanded}">
                         <div class="interaction-chevron">
                             <span class="codicon codicon-${chevronIcon}"></span>
