@@ -581,6 +581,8 @@ button:disabled {
     /* Fix: Limit height and enable scrolling when many attachments are added */
     max-height: var(--chips-container-max-height);
     overflow-y: auto;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
 }
 
 /* Monaco-style scrollbar for chips container */
