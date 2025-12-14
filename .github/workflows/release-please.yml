@@ -49,7 +49,7 @@ jobs:
         run: npm run package:vsce
 
       - name: Publish to VS Code Marketplace
-        run: vsce publish seamless-agent-${{ needs.release-please.outputs.version }}.vsix
+        run: vsce publish
         env:
           VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
 
@@ -63,7 +63,7 @@ jobs:
         run: npm run package:ovsx
 
       - name: Publish to Open VSX
-        run: npx ovsx publish seamless-agent-${{ needs.release-please.outputs.version }}-antigravity.vsix
+        run: npx ovsx publish seamless-agent-*-antigravity.vsix
         env:
           OVSX_PAT: ${{ secrets.OVSX_TOKEN }}
 
