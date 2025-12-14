@@ -17,25 +17,31 @@ const { z } = require('zod');
 function parseArgs() {
     const args = process.argv.slice(2);
     let port = null;
+    let token = null;
 
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--port' && args[i + 1]) {
             port = parseInt(args[i + 1], 10);
             i++;
         }
+        if (args[i] === '--token' && args[i + 1]) {
+            token = String(args[i + 1]);
+            i++;
+        }
     }
 
-    if (!port || isNaN(port)) {
-        console.error('Usage: seamless-agent-mcp --port <api-port>');
+    if (!port || isNaN(port) || !token) {
+        console.error('Usage: seamless-agent-mcp --port <api-port> --token <api-token>');
         console.error('  --port  The port where the VS Code extension API is running');
+        console.error('  --token Authentication token for the local API service');
         process.exit(1);
     }
 
-    return { port };
+    return { port, token };
 }
 
 // Make HTTP request to VS Code extension API
-async function callExtensionApi(port, endpoint, data) {
+async function callExtensionApi(port, token, endpoint, data) {
     const url = `http://localhost:${port}${endpoint}`;
 
     try {
@@ -43,6 +49,7 @@ async function callExtensionApi(port, endpoint, data) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
             },
             body: JSON.stringify(data),
         });
@@ -65,7 +72,7 @@ async function callExtensionApi(port, endpoint, data) {
 }
 
 async function main() {
-    const { port } = parseArgs();
+    const { port, token } = parseArgs();
 
     // Create MCP server
     const server = new McpServer({
@@ -84,7 +91,7 @@ async function main() {
         },
         async (args) => {
             try {
-                const result = await callExtensionApi(port, '/ask_user', {
+                const result = await callExtensionApi(port, token, '/ask_user', {
                     question: args.question,
                     title: args.title,
                     agentName: args.agentName,

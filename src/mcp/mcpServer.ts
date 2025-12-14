@@ -3,6 +3,7 @@ import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as crypto from 'crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
@@ -77,7 +78,7 @@ export class McpServerManager {
 
             // Create transport
             this.transport = new StreamableHTTPServerTransport({
-                sessionIdGenerator: () => `sess_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+                sessionIdGenerator: () => `sess_${crypto.randomUUID()}`
             });
 
             // Connect server to transport
@@ -85,19 +86,8 @@ export class McpServerManager {
 
             // Create HTTP server
             this.server = http.createServer(async (req, res) => {
+                // Intencionalmente NÃO habilitamos CORS e evitamos logar headers (podem conter credenciais).
                 console.log(`[MCP Server] Incoming request: ${req.method} ${req.url}`);
-                console.log(`[MCP Server] Headers: ${JSON.stringify(req.headers)}`);
-
-                // CORS headers
-                res.setHeader('Access-Control-Allow-Origin', '*');
-                res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE');
-                res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-                if (req.method === 'OPTIONS') {
-                    res.writeHead(200);
-                    res.end();
-                    return;
-                }
 
                 try {
                     const url = req.url || '/';
@@ -152,7 +142,7 @@ export class McpServerManager {
 
             // Start listening
             await new Promise<void>((resolve) => {
-                this.server?.listen(this.port, () => resolve());
+                this.server?.listen(this.port, '127.0.0.1', () => resolve());
             });
 
             // Register with Antigravity
@@ -203,7 +193,7 @@ export class McpServerManager {
     private async findAvailablePort(): Promise<number> {
         return new Promise((resolve, reject) => {
             const server = http.createServer();
-            server.listen(0, () => {
+            server.listen(0, '127.0.0.1', () => {
                 const address = server.address();
                 if (address && typeof address !== 'string') {
                     const port = address.port;
