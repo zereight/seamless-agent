@@ -167,7 +167,7 @@ export class McpServerManager {
             // -----------------------------
 
             this.mcpServer.registerTool(
-                "createTaskList",
+                "create_task_list",
                 {
                     inputSchema: z.object({
                         title: z.string().describe('Task list title'),
@@ -206,10 +206,10 @@ export class McpServerManager {
             );
 
             this.mcpServer.registerTool(
-                "getNextTask",
+                "get_next_task",
                 {
                     inputSchema: z.object({
-                        listId: z.string().describe('Task list id returned by createTaskList')
+                        listId: z.string().describe('Task list id returned by create_task_list')
                     })
                 },
                 async (args: any) => {
@@ -231,7 +231,7 @@ export class McpServerManager {
             );
 
             this.mcpServer.registerTool(
-                "updateTaskStatus",
+                "update_task_status",
                 {
                     inputSchema: z.object({
                         listId: z.string().describe('Task list id'),
@@ -262,7 +262,7 @@ export class McpServerManager {
             );
 
             this.mcpServer.registerTool(
-                "closeTaskList",
+                "close_task_list",
                 {
                     inputSchema: z.object({
                         listId: z.string().describe('Task list id')

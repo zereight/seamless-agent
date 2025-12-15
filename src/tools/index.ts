@@ -238,7 +238,7 @@ export function registerNativeTools(context: vscode.ExtensionContext, provider: 
     });
 
     // New Task List Flow Tools (recommended)
-    const createTaskListTool = vscode.lm.registerTool('createTaskList', {
+    const createTaskListTool = vscode.lm.registerTool('create_task_list', {
         async invoke(options: vscode.LanguageModelToolInvocationOptions<CreateTaskListInput>, _token: vscode.CancellationToken) {
             let params: CreateTaskListInput;
             try {
@@ -257,7 +257,7 @@ export function registerNativeTools(context: vscode.ExtensionContext, provider: 
         }
     });
 
-    const getNextTaskTool = vscode.lm.registerTool('getNextTask', {
+    const getNextTaskTool = vscode.lm.registerTool('get_next_task', {
         async invoke(options: vscode.LanguageModelToolInvocationOptions<GetNextTaskInput>, _token: vscode.CancellationToken) {
             let params: GetNextTaskInput;
             try {
@@ -276,7 +276,7 @@ export function registerNativeTools(context: vscode.ExtensionContext, provider: 
         }
     });
 
-    const updateTaskStatusTool = vscode.lm.registerTool('updateTaskStatus', {
+    const updateTaskStatusTool = vscode.lm.registerTool('update_task_status', {
         async invoke(options: vscode.LanguageModelToolInvocationOptions<UpdateTaskStatusInput>, _token: vscode.CancellationToken) {
             let params: UpdateTaskStatusInput;
             try {
@@ -295,7 +295,7 @@ export function registerNativeTools(context: vscode.ExtensionContext, provider: 
         }
     });
 
-    const closeTaskListTool = vscode.lm.registerTool('closeTaskList', {
+    const closeTaskListTool = vscode.lm.registerTool('close_task_list', {
         async invoke(options: vscode.LanguageModelToolInvocationOptions<CloseTaskListInput>, _token: vscode.CancellationToken) {
             let params: CloseTaskListInput;
             try {

@@ -234,7 +234,7 @@
         }
       },
       {
-        "name": "createTaskList",
+        "name": "create_task_list",
         "tags": [
           "task-management",
           "progress",
@@ -293,7 +293,7 @@
         }
       },
       {
-        "name": "getNextTask",
+        "name": "get_next_task",
         "tags": [
           "task-management",
           "progress",
@@ -312,7 +312,7 @@
           "properties": {
             "listId": {
               "type": "string",
-              "description": "Task list id returned by createTaskList"
+              "description": "Task list id returned by create_task_list"
             }
           },
           "required": [
@@ -321,7 +321,7 @@
         }
       },
       {
-        "name": "updateTaskStatus",
+        "name": "update_task_status",
         "tags": [
           "task-management",
           "progress",
@@ -364,7 +364,7 @@
         }
       },
       {
-        "name": "closeTaskList",
+        "name": "close_task_list",
         "tags": [
           "task-management",
           "progress",

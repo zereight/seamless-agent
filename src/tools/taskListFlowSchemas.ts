@@ -21,7 +21,7 @@ export const CreateTaskListInputSchema = z.object({
 
 export const GetNextTaskInputSchema = z.object({
     listId: z.string().min(1, 'listId cannot be empty')
-        .describe('Task list id returned by createTaskList')
+        .describe('Task list id returned by create_task_list')
 });
 
 export const UpdateTaskStatusInputSchema = z.object({

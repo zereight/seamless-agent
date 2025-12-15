@@ -129,11 +129,11 @@ async function main() {
     server.registerTool(
         'plan_review',
         {
-            description: "Present content to user for review with comments. All modes support line-by-line user comments. Modes: 'review' (approve/reject plans - default), 'summary' (session end summaries), 'progress' (task progress updates), 'walkthrough' (step-by-step guides), 'display' (diagrams/content). Content is rendered with Markdown and code highlighting. History is saved and accessible from the extension panel. Returns an object with 'status' (string) and 'comments' (array). Status values: 'approved' (user approved - consider comments if any and continue), 'recreateWithChanges' (user wants changes - apply the suggested changes from comments and submit the plan again, no need confirm with ask_user in this case), 'cancelled' (something went wrong - try again).",
+            description: "Present a plan to the user for approval (review mode).",
             inputSchema: z.object({
                 plan: z.string().describe('The detailed plan in Markdown format to present to the user for review. Use headers, bullet points, and code blocks for clarity.'),
                 title: z.string().optional().describe('Optional title for the review panel. Defaults to "Review Plan".'),
-                mode: z.enum(['review', 'summary', 'progress', 'walkthrough', 'display']).optional().describe('The review mode: "review" for plan approval (default), "summary" for session summaries, "progress" for task updates, "walkthrough" for step-by-step guides, "display" for viewing content.'),
+                chatId: z.string().optional().describe('Optional chat ID to associate the review with a specific conversation.'),
             })
         },
         async (args) => {
@@ -141,7 +141,56 @@ async function main() {
                 const result = await callExtensionApi(port, token, '/plan_review', {
                     plan: args.plan,
                     title: args.title,
-                    mode: args.mode,
+                    mode: 'review',
+                    chatId: args.chatId,
+                });
+
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: JSON.stringify(result),
+                        },
+                    ],
+                };
+            } catch (error) {
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: JSON.stringify({
+                                status: 'cancelled',
+                                comments: [],
+                                reviewId: '',
+                                error: `Error: ${error.message}`,
+                            }),
+                        },
+                    ],
+                    isError: true,
+                };
+            }
+        }
+    );
+
+
+    // Register plan_review tool
+    server.registerTool(
+        'walkthrough_review',
+        {
+            description: "Present content as a walkthrough (step-by-step guide) in a dedicated panel with comment support.",
+            inputSchema: z.object({
+                plan: z.string().describe('The detailed plan in Markdown format to present to the user for review. Use headers, bullet points, and code blocks for clarity.'),
+                title: z.string().optional().describe('Optional title for the review panel. Defaults to "Review Plan".'),
+                chatId: z.string().optional().describe('Optional chat ID to associate the review with a specific conversation.'),
+            })
+        },
+        async (args) => {
+            try {
+                const result = await callExtensionApi(port, token, '/plan_review', {
+                    plan: args.plan,
+                    title: args.title,
+                    mode: 'walkthrough',
+                    chatId: args.chatId,
                 });
 
                 return {
