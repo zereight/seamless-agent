@@ -32,15 +32,6 @@ Present Markdown content as a step-by-step walkthrough for review (approve/reque
 - **Comment Support** — Comments anchored to specific parts
 - **Structured Output** — Returns `{ status, requiredRevisions, reviewId }`
 
-### Task List Flow Tools (recommended)
-
-Interactive task lists visible in real-time (with a dedicated panel). This is the recommended flow for task execution **with comments arriving before execution**:
-
-- `createTaskList` → creates the list and returns `listId`
-- `getNextTask` → returns the next pending task **plus pending comments for that task**
-- `updateTaskStatus` → updates status (in-progress / completed / blocked). Then call `getNextTask` again
-- `closeTaskList` → archives the list and returns a summary
-
 ## Usage
 
 Once installed, the MCP tools are automatically available to your Agent (tool names may appear as `mcp_<toolName>` depending on the client):
@@ -48,10 +39,6 @@ Once installed, the MCP tools are automatically available to your Agent (tool na
 - `ask_user`
 - `plan_review`
 - `walkthrough_review`
-- `createTaskList`
-- `getNextTask`
-- `updateTaskStatus`
-- `closeTaskList`
 
 ### Automatic Usage
 
@@ -72,8 +59,6 @@ To ensure the AI always asks for your confirmation before completing tasks, add 
 # Ground rules NEVER BREAK IT, NO EXCEPTIONS
 - Whenever you have a question, or a decision to make, always ask the user through the tool `ask_user` (or `mcp_ask_user`)
 - Never stop a task without permission from the tool `ask_user` (or `mcp_ask_user`)
-
-- When using task lists, follow the loop: createTaskList → getNextTask → (process comments) → updateTaskStatus → getNextTask → ... → closeTaskList
 ```
 
 You can add this in Antigravity by opening the `Agent Option`, inside the `Agent` panel, and clicking in the option `Customizations`. Then you add a new `Rule` for general use or `Workflow` or specifics workflows.
@@ -103,7 +88,13 @@ The MCP config uses the standard command format:
   "mcpServers": {
     "seamless-agent": {
       "command": "node",
-      "args": ["<extension-path>/bin/seamless-agent-mcp.js", "--port", "<port>"]
+      "args": [
+        "<extension-path>/dist/seamless-agent-mcp.js",
+        "--port",
+        "<port>",
+        "--token",
+        "<token>"
+      ]
     }
   }
 }

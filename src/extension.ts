@@ -86,12 +86,6 @@ export function activate(context: vscode.ExtensionContext) {
     });
     (context.subscriptions as unknown as Array<vscode.Disposable>).push(showHistoryCommand);
 
-    // Register command to show task lists
-    const showTaskListsCommand = vscode.commands.registerCommand('seamless-agent.showTaskLists', () => {
-        provider.switchTab('tasks');
-    });
-    (context.subscriptions as unknown as Array<vscode.Disposable>).push(showTaskListsCommand);
-
     // Register command to clear history
     const clearHistoryCommand = vscode.commands.registerCommand('seamless-agent.clearHistory', async () => {
         const result = await vscode.window.showWarningMessage(

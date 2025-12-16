@@ -93,7 +93,7 @@ export interface AskUserToolResult {
  * Result structure for approve_plan tool
  */
 export interface ApprovePlanToolResult {
-    status: 'approved' | 'recreateWithChanges' | 'cancelled';
+    status: 'approved' | 'recreateWithChanges' | 'cancelled' | 'acknowledged';
     requiredRevisions: RequiredPlanRevisions[];
 }
 
@@ -101,7 +101,7 @@ export interface ApprovePlanToolResult {
  * Result structure for plan_review tool
  */
 export interface PlanReviewToolResult {
-    status: 'approved' | 'recreateWithChanges' | 'cancelled';
+    status: 'approved' | 'recreateWithChanges' | 'cancelled' | 'acknowledged';
     requiredRevisions: RequiredPlanRevisions[];
     reviewId: string;
 }

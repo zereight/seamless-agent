@@ -131,46 +131,8 @@ export const strings = {
 
     // History filters
     get historyFilterAll() { return localize('history.filter.all'); },
-    get historyFilterTaskLists() { return localize('history.filter.taskLists'); },
     get historyFilterAskUser() { return localize('history.filter.askUser'); },
     get historyFilterPlanReview() { return localize('history.filter.planReview'); },
-    // Task Lists
-    get taskLists() { return localize('console.taskLists'); },
-    get noTaskLists() { return localize('console.noTaskLists'); },
-    get taskListNotFound() { return localize('taskList.notFound'); },
-    get taskListClosed() { return localize('status.closed'); },
-    get taskListActive() { return localize('status.active'); },
-    get tasks() { return localize('console.tasks'); },
-    // Task List Panel
-    get taskListArchived() { return localize('taskList.archived'); },
-    get taskListTasksCompleted() { return localize('taskList.tasksCompleted'); },
-    get taskListNoTasks() { return localize('taskList.noTasks'); },
-    get taskListAddComment() { return localize('taskList.addComment'); },
-    get taskListComments() { return localize('taskList.comments'); },
-    get taskListSent() { return localize('taskList.sent'); },
-    get taskListPending() { return localize('taskList.pending'); },
-    get taskListSubmit() { return localize('taskList.submit'); },
-    get taskListReopenTask() { return localize('taskList.reopenTask'); },
-    get taskListCommentPlaceholder() { return localize('taskList.commentPlaceholder'); },
-    get taskListRemoveComment() { return localize('taskList.removeComment'); },
-    // Task List Breakpoint & Resume
-    get listId() { return localize('taskList.listId'); },
-    get copyId() { return localize('taskList.copyId'); },
-    get idCopied() { return localize('taskList.idCopied'); },
-    get breakpointActive() { return localize('taskList.breakpointBanner'); },
-    get breakpointPlaceholder() { return localize('taskList.breakpointPlaceholder'); },
-    get breakpointSubmit() { return localize('taskList.breakpointSubmit'); },
-    get breakpointCancel() { return localize('taskList.breakpointCancel'); },
-    get breakpointIndicator() { return localize('taskList.breakpointIndicator'); },
-    get addBreakpoint() { return localize('taskList.addBreakpoint'); },
-    get removeBreakpoint() { return localize('taskList.removeBreakpoint'); },
-    // Resume task
-    get resumeTitle() { return localize('resume.title'); },
-    get resumeDescription() { return localize('resume.description'); },
-    get resumeAvailableLists() { return localize('resume.availableLists'); },
-    get resumeInputPlaceholder() { return localize('resume.inputPlaceholder'); },
-    get resumeSubmit() { return localize('resume.submit'); },
-    get resumeNoOpenLists() { return localize('resume.noOpenLists'); },
 
     // Attachments / images
     get attachmentNoFilesFound() { return localize('attachment.noFilesFound'); },

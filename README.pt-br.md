@@ -15,10 +15,9 @@ Uma ferramenta de Language Model que permite ao Copilot solicitar confirmação 
 
 - **Confirmação do Usuário** — Obtenha aprovação explícita antes do Copilot executar ações críticas
 - **Input Interativo** — Forneça contexto adicional ou instruções durante a conversa
+  - **Colar Imagens** — Cole imagens diretamente na área de input para dar contexto
+  - **Referências & Anexos** — Referencie arquivos do workspace usando `#filename` e anexe arquivos à sua resposta
 - **Validação de Tarefas** — Confirme se uma tarefa foi concluída conforme suas especificações
-- **Integração Seamless** — Funciona naturalmente dentro do fluxo do Copilot Chat
-- **Colar Imagens** — Cole imagens diretamente na área de input para dar contexto
-- **Referências & Anexos** — Referencie arquivos do workspace usando `#filename` e anexe arquivos à sua resposta
 
 ### Ferramenta Plan Review (`#planReview`)
 
@@ -39,33 +38,15 @@ Uma ferramenta de Language Model que apresenta conteúdo Markdown como um walkth
 - **Suporte a Comentários** — Feedback ancorado em partes específicas do walkthrough
 - **Retorno Estruturado** — Retorna `{ status, requiredRevisions: [{ revisedPart, revisorInstructions }], reviewId }`
 
-### Task Lists (novo fluxo)
-
-Listas de tarefas interativas (com painel dedicado) para acompanhar progresso e deixar feedback enquanto o agente trabalha.
-
-- **Painel em Tempo Real** — UI estilo walkthrough com status e progresso
-- **Comentários por Tarefa** — Comente em qualquer tarefa (inclusive reabrindo uma tarefa concluída)
-- **Integração com Histórico** — Task lists fechadas aparecem no Histórico
-
-#### Fluxo recomendado para Task Lists
-
-Para garantir que o agente receba seus comentários **antes** de executar cada tarefa, use o fluxo abaixo:
-
-- `#createTaskList` → cria a lista e retorna `listId`
-- `#getNextTask` → retorna a próxima tarefa pendente **+ comentários pendentes dessa tarefa**
-- `#updateTaskStatus` → atualiza status (in-progress / completed / blocked). Em seguida, chame `#getNextTask` para obter a próxima tarefa + comentários
-- `#closeTaskList` → arquiva a lista e retorna um resumo
-
-### Histórico (Ask User, Plan Review, Task Lists)
+### Histórico (Solicitações, Plan Reviews)
 
 O painel do Seamless Agent inclui um Histórico unificado (mais recente primeiro), com filtros:
 
 - **Todos**
-- **Task Lists**
 - **Ask User**
 - **Plan Review**
 
-Você pode abrir detalhes de ask_user, reabrir plan reviews/task lists pelo histórico e apagar itens individuais.
+Você pode abrir detalhes de ask_user, abrir painéis de plan review pelo histórico e apagar itens individuais.
 
 ### Ferramenta Approve Plan (`#approvePlan`) (Deprecada)
 
@@ -80,9 +61,9 @@ Após a instalação, as ferramentas estão automaticamente disponíveis para o 
 O Copilot usará automaticamente esta ferramenta quando precisar da sua confirmação. Quando acionada:
 
 1. Uma notificação aparece no VS Code
-2. Clique em "Responder" para abrir o diálogo de input
+2. Clique em "Abrir Console" para abrir o painel de solicitações
 3. Digite sua resposta
-4. O Copilot continua baseado na sua resposta
+4. O Copilot continua com base na sua resposta
 
 ### Revisando um plano com `#planReview` (tool: `plan_review`)
 
@@ -104,18 +85,6 @@ Use quando você quiser um guia passo a passo apresentado para revisão/feedback
 3. Clique em **Approve** para seguir, ou **Request Changes** para pedir ajustes
 4. O Copilot continua com base em `{ status, requiredRevisions, reviewId }`
 
-### Usando Task Lists (fluxo recomendado)
-
-Em alto nível, o agente deve:
-
-1. Criar a lista com `#createTaskList` (guarde o `listId`)
-2. Loop:
-   - Chamar `#getNextTask`
-   - Aplicar `comments[]` **antes** de executar a tarefa
-   - Executar a tarefa
-   - Chamar `#updateTaskStatus`
-3. Ao finalizar, chamar `#closeTaskList`
-
 ## Dicas
 
 ### Prompt de Sistema Recomendado
@@ -127,8 +96,6 @@ Quando a tarefa exigir múltiplos passos ou mudanças não triviais, apresente u
 Se o plano for rejeitado, incorpore os comentários e envie um plano atualizado com #planReview.
 Quando o usuário pedir um guia passo a passo (walkthrough), apresente-o usando #walkthroughReview.
 Sempre use #askUser antes de concluir qualquer tarefa para confirmar com o usuário que a solicitação foi atendida corretamente.
-
-Quando usar task lists, prefira o fluxo: #createTaskList → #getNextTask → #updateTaskStatus → ... → #closeTaskList.
 ```
 
 Você pode adicionar isso ao arquivo `.github/copilot-instructions.md` do seu projeto
@@ -144,7 +111,7 @@ Aguarde minha aprovação (ou pedidos de ajuste). Só então implemente o plano.
 
 ## Requisitos
 
-- VS Code 1.106.1 ou superior
+- VS Code 1.104.1 ou superior
 - Extensão GitHub Copilot Chat
 
 ## Configurações

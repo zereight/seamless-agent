@@ -5,13 +5,10 @@ import { initializeChatHistoryStorage } from '../storage/chatHistoryStorage';
 
 // Re-export schemas and types
 export * from './schemas';
-export * from './taskListSchemas';
 
 // Re-export tool functions
 export { askUser } from './askUser';
 export { planReview, planReviewApproval, walkthroughReview } from './planReview';
-export { initializeTaskListStorage, getTaskListStorage } from './taskList';
-export { createTaskList, getNextTask, updateTaskStatus, closeTaskList, resumeTaskList } from './taskListFlow';
 
 // Re-export utils
 export * from './utils';
@@ -19,8 +16,6 @@ export * from './utils';
 // Import for internal use
 import { askUser } from './askUser';
 import { planReviewApproval, walkthroughReview } from './planReview';
-import { initializeTaskListStorage } from './taskList';
-import { createTaskList, getNextTask, updateTaskStatus, closeTaskList, resumeTaskList } from './taskListFlow';
 import { readFileAsBuffer, getImageMimeType, validateImageMagicNumber } from './utils';
 import {
     AskUserInput,
@@ -32,20 +27,6 @@ import {
     parsePlanReviewInput,
     parseWalkthroughReviewInput,
 } from './schemas';
-
-
-import {
-    CreateTaskListInput,
-    GetNextTaskInput,
-    UpdateTaskStatusInput,
-    CloseTaskListInput,
-    ResumeTaskListInput,
-    parseCreateTaskListInput,
-    parseGetNextTaskInput,
-    parseUpdateTaskStatusInput,
-    parseCloseTaskListInput,
-    parseResumeTaskListInput
-} from './taskListFlowSchemas';
 
 /**
  * Registers the native VS Code LM Tools
@@ -239,117 +220,13 @@ export function registerNativeTools(context: vscode.ExtensionContext, provider: 
         }
     });
 
-    // New Task List Flow Tools (recommended)
-    const createTaskListTool = vscode.lm.registerTool('create_task_list', {
-        async invoke(options: vscode.LanguageModelToolInvocationOptions<CreateTaskListInput>, _token: vscode.CancellationToken) {
-            let params: CreateTaskListInput;
-            try {
-                params = parseCreateTaskListInput(options.input);
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : 'Invalid input';
-                return new vscode.LanguageModelToolResult([
-                    new vscode.LanguageModelTextPart(JSON.stringify({ error: `Validation error: ${errorMessage}` }))
-                ]);
-            }
-
-            const result = await createTaskList(params, context, provider);
-            return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart(JSON.stringify(result))
-            ]);
-        }
-    });
-
-    const getNextTaskTool = vscode.lm.registerTool('get_next_task', {
-        async invoke(options: vscode.LanguageModelToolInvocationOptions<GetNextTaskInput>, _token: vscode.CancellationToken) {
-            let params: GetNextTaskInput;
-            try {
-                params = parseGetNextTaskInput(options.input);
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : 'Invalid input';
-                return new vscode.LanguageModelToolResult([
-                    new vscode.LanguageModelTextPart(JSON.stringify({ error: `Validation error: ${errorMessage}` }))
-                ]);
-            }
-
-            const result = await getNextTask(params, context, provider);
-            return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart(JSON.stringify(result))
-            ]);
-        }
-    });
-
-    const updateTaskStatusTool = vscode.lm.registerTool('update_task_status', {
-        async invoke(options: vscode.LanguageModelToolInvocationOptions<UpdateTaskStatusInput>, _token: vscode.CancellationToken) {
-            let params: UpdateTaskStatusInput;
-            try {
-                params = parseUpdateTaskStatusInput(options.input);
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : 'Invalid input';
-                return new vscode.LanguageModelToolResult([
-                    new vscode.LanguageModelTextPart(JSON.stringify({ error: `Validation error: ${errorMessage}` }))
-                ]);
-            }
-
-            const result = await updateTaskStatus(params, context, provider);
-            return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart(JSON.stringify(result))
-            ]);
-        }
-    });
-
-    const closeTaskListTool = vscode.lm.registerTool('close_task_list', {
-        async invoke(options: vscode.LanguageModelToolInvocationOptions<CloseTaskListInput>, _token: vscode.CancellationToken) {
-            let params: CloseTaskListInput;
-            try {
-                params = parseCloseTaskListInput(options.input);
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : 'Invalid input';
-                return new vscode.LanguageModelToolResult([
-                    new vscode.LanguageModelTextPart(JSON.stringify({ error: `Validation error: ${errorMessage}` }))
-                ]);
-            }
-
-            const result = await closeTaskList(params, context, provider);
-            return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart(JSON.stringify(result))
-            ]);
-        }
-    });
-
-    const resumeTaskListTool = vscode.lm.registerTool('resume_task', {
-        async invoke(options: vscode.LanguageModelToolInvocationOptions<ResumeTaskListInput>, _token: vscode.CancellationToken) {
-            let params: ResumeTaskListInput;
-            try {
-                params = parseResumeTaskListInput(options.input);
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : 'Invalid input';
-                return new vscode.LanguageModelToolResult([
-                    new vscode.LanguageModelTextPart(JSON.stringify({ error: `Validation error: ${errorMessage}` }))
-                ]);
-            }
-
-            const result = await resumeTaskList(params, context, provider);
-            return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart(JSON.stringify(result))
-            ]);
-        }
-    });
-
     (context.subscriptions as unknown as Array<vscode.Disposable>).push(
         confirmationTool,
         approvePlanTool,
         planReviewTool,
-        walkthroughReviewTool,
-        createTaskListTool,
-        getNextTaskTool,
-        updateTaskStatusTool,
-        closeTaskListTool,
-        resumeTaskListTool
+        walkthroughReviewTool
     );
 
     // Initialize chat history storage
     initializeChatHistoryStorage(context);
-
-    // Initialize task list storage
-    initializeTaskListStorage(context);
 }

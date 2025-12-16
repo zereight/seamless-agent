@@ -83,10 +83,11 @@ export async function planReview(
         provider.refreshHome();
 
         // Map action to status for LLM response
-        const status: 'approved' | 'recreateWithChanges' | 'cancelled' = [
+        const status: 'approved' | 'recreateWithChanges' | 'cancelled' | 'acknowledged' = [
             'approved',
             'recreateWithChanges',
-            'cancelled'
+            'cancelled',
+            'acknowledged'
         ].includes(result.action)
             ? result.action as 'approved' | 'recreateWithChanges' | 'cancelled'
             : 'cancelled';

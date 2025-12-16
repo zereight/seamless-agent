@@ -98,21 +98,7 @@ async function main() {
         plugins: [esbuildProblemMatcherPlugin],
     });
 
-    // Task List webview bundle (browser)
-    const taskListCtx = await esbuild.context({
-        entryPoints: ['src/webview/taskList.ts'],
-        bundle: true,
-        format: 'iife',
-        minify: production,
-        sourcemap: !production,
-        sourcesContent: false,
-        platform: 'browser',
-        outfile: 'dist/taskList.js',
-        logLevel: 'info',
-        plugins: [esbuildProblemMatcherPlugin],
-    });
-
-    const contexts = [extensionCtx, webviewCtx, planReviewCtx, taskListCtx];
+    const contexts = [extensionCtx, webviewCtx, planReviewCtx];
 
     // CLI bundle (Node.js standalone) - Only for Antigravity
     if (antigravity) {

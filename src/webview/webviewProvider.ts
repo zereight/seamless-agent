@@ -14,8 +14,6 @@ import {
 
 import { getExcludePattern } from '../config/ignorePaths';
 import { ChatHistoryStorage, getChatHistoryStorage } from '../storage/chatHistoryStorage';
-import { getTaskListStorage } from '../tools/taskList';
-import { TaskListSession } from '../tools/taskListSchemas';
 
 import {
     AttachmentInfo,
@@ -146,19 +144,6 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
 
         // Clear all chats and interactions from storage
         this._chatHistoryStorage.clearAll();
-
-        // Also clear CLOSED task lists from storage (history should be empty)
-        try {
-            const taskListStorage = getTaskListStorage();
-            const sessions = taskListStorage.getAllSessions();
-            for (const session of sessions) {
-                if (session.closed) {
-                    taskListStorage.deleteSession(session.id);
-                }
-            }
-        } catch {
-            // TaskListStorage not initialized yet
-        }
 
         this._showHome();
     }
@@ -377,24 +362,9 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
         const pendingPlanReviews = this._chatHistoryStorage.getPendingPlanReviews();
         const historyInteractions = this._chatHistoryStorage.getCompletedInteractions();
 
-        // Get task lists (active and closed separately)
-        let activeTaskLists: TaskListSession[] = [];
-        let closedTaskLists: TaskListSession[] = [];
-        try {
-            const taskListStorage = getTaskListStorage();
-            const allTaskLists = taskListStorage.getAllSessions();
-            activeTaskLists = allTaskLists.filter((s: TaskListSession) => !s.closed);
-            closedTaskLists = allTaskLists.filter((s: TaskListSession) => s.closed);
-        } catch (e) {
-            // TaskListStorage not initialized yet
-            console.log('[Seamless Agent] TaskListStorage not initialized');
-        }
-
         console.log('[Seamless Agent] _showHome called:', {
             pendingRequestsCount: pendingRequests.length,
             pendingPlanReviewsCount: pendingPlanReviews.length,
-            activeTaskListsCount: activeTaskLists.length,
-            closedTaskListsCount: closedTaskLists.length,
             historyInteractionsCount: historyInteractions.length,
             pendingPlanReviews: pendingPlanReviews.map(r => ({ id: r.id, title: r.title, status: r.status }))
         });
@@ -403,15 +373,13 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
             type: 'showHome',
             pendingRequests,
             pendingPlanReviews,
-            activeTaskLists,
             historyInteractions,
-            closedTaskLists,
             recentInteractions: this._recentInteractions
         };
         this._view?.webview.postMessage(message);
 
-        // Update badge with total pending count (requests + plan reviews + active task lists)
-        const totalPending = pendingRequests.length + pendingPlanReviews.length + activeTaskLists.length;
+        // Update badge with total pending count (requests + plan reviews)
+        const totalPending = pendingRequests.length + pendingPlanReviews.length;
         this._setBadge(totalPending);
     }
 
@@ -422,85 +390,10 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
         this._showHome();
     }
 
-    // ========================
-    // Resume Task List Methods
-    // ========================
-
-    // Map of pending resume task requests
-    private _pendingResumeTaskRequests: Map<string, {
-        resolve: (listId: string) => void;
-        reject: (reason?: unknown) => void;
-    }> = new Map();
-
-    /**
-     * Request user to provide a task list ID for resuming.
-     * Opens an input card in the webview for the user to enter or select a list ID.
-     */
-    public async requestResumeTaskListId(
-        availableLists: Array<{ id: string; title: string }>
-    ): Promise<string> {
-        // If the view isn't available, try to open it
-        if (!this._view) {
-            try {
-                await vscode.commands.executeCommand('seamlessAgentView.focus');
-                await new Promise(resolve => setTimeout(resolve, 500));
-
-                if (!this._view) {
-                    throw new Error('Agent Console view is not available.');
-                }
-            } catch (error) {
-                throw new Error('Agent Console view is not available.');
-            }
-        }
-
-        const requestId = `resume_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-
-        return new Promise<string>((resolve, reject) => {
-            this._pendingResumeTaskRequests.set(requestId, { resolve, reject });
-
-            // Send message to show resume input
-            const message: ToWebviewMessage = {
-                type: 'showResumeTaskInput',
-                requestId,
-                availableLists
-            };
-            this._view?.webview.postMessage(message);
-
-            // Show notification if panel is not visible
-            if (!this._view?.visible) {
-                this._showNotification();
-            }
-        });
-    }
-
-    /**
-     * Resolve a pending resume task request
-     */
-    private _resolveResumeTaskRequest(requestId: string, listId: string): void {
-        const pending = this._pendingResumeTaskRequests.get(requestId);
-        if (pending) {
-            pending.resolve(listId);
-            this._pendingResumeTaskRequests.delete(requestId);
-            this._showHome();
-        }
-    }
-
-    /**
-     * Cancel a pending resume task request
-     */
-    private _cancelResumeTaskRequest(requestId: string): void {
-        const pending = this._pendingResumeTaskRequests.get(requestId);
-        if (pending) {
-            pending.reject(new Error('User cancelled'));
-            this._pendingResumeTaskRequests.delete(requestId);
-            this._showHome();
-        }
-    }
-
     /**
      * Public method to switch tabs in the webview (called from commands)
      */
-    public switchTab(tab: 'pending' | 'history' | 'tasks'): void {
+    public switchTab(tab: 'pending' | 'history'): void {
         const message: ToWebviewMessage = {
             type: 'switchTab',
             tab
@@ -588,16 +481,6 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
             case 'openPlanReviewPanel': this._handleOpenPlanReviewPanel(message.interactionId);
                 break;
             case 'deleteInteraction': this._handleDeleteInteraction(message.interactionId);
-                break;
-            case 'openTaskList': this._handleOpenTaskList(message.listId);
-                break;
-            case 'deleteTaskList': this._handleDeleteTaskList(message.listId);
-                break;
-            case 'resumeTaskInputSubmit': 
-                this._resolveResumeTaskRequest(message.requestId, message.listId);
-                break;
-            case 'resumeTaskInputCancel': 
-                this._cancelResumeTaskRequest(message.requestId);
                 break;
         }
     }
@@ -1419,49 +1302,6 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    /**
-     * Handle opening a task list in the TaskListPanel
-     */
-    private async _handleOpenTaskList(listId: string): Promise<void> {
-        try {
-            const taskListStorage = getTaskListStorage();
-            const session = taskListStorage.getSession(listId);
-
-            if (session) {
-                // Import dynamically to avoid circular dependency
-                const { TaskListPanel } = await import('./taskListPanel');
-
-                // Open the task list panel
-                TaskListPanel.open(
-                    this._extensionUri,
-                    listId,
-                    taskListStorage
-                );
-            } else {
-                console.warn('[Seamless Agent] Task list not found:', listId);
-                vscode.window.showWarningMessage(strings.taskListNotFound || 'Task list not found');
-            }
-        } catch (e) {
-            console.error('[Seamless Agent] Error opening task list:', e);
-        }
-    }
-
-    /**
-     * Handle deleting a task list
-     */
-    private async _handleDeleteTaskList(listId: string): Promise<void> {
-        try {
-            const taskListStorage = getTaskListStorage();
-            taskListStorage.deleteSession(listId);
-            console.log('[Seamless Agent] Task list deleted:', listId);
-
-            // Refresh the home view
-            this._showHome();
-        } catch (e) {
-            console.error('[Seamless Agent] Error deleting task list:', e);
-        }
-    }
-
     private _getHtmlContent(webview: vscode.Webview): string {
         // Get URIs for resources
         const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'main.css'));
@@ -1490,7 +1330,6 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
             '{{noPendingRequests}}': strings.noPendingRequests,
             '{{noPendingItems}}': strings.noPendingItems,
             '{{pendingItems}}': strings.pendingItems,
-            '{{noTaskLists}}': strings.noTaskLists,
             '{{pendingRequests}}': strings.pendingRequests,
             '{{yourResponse}}': strings.yourResponse,
             '{{inputPlaceholder}}': strings.inputPlaceholder,
@@ -1531,14 +1370,8 @@ export class AgentInteractionProvider implements vscode.WebviewViewProvider {
             '{{noResponse}}': strings.noResponse,
             // History filter tooltips
             '{{historyFilterAll}}': strings.historyFilterAll,
-            '{{historyFilterTaskLists}}': strings.historyFilterTaskLists,
             '{{historyFilterAskUser}}': strings.historyFilterAskUser,
-            '{{historyFilterPlanReview}}': strings.historyFilterPlanReview,
-            // Task List strings
-            '{{taskLists}}': strings.taskLists,
-            '{{tasks}}': strings.tasks,
-            '{{closed}}': strings.taskListClosed,
-            '{{active}}': strings.taskListActive
+            '{{historyFilterPlanReview}}': strings.historyFilterPlanReview
         };
 
         for (const [placeholder, value] of Object.entries(replacements)) {

@@ -110,12 +110,6 @@ declare global {
             response: string;
             noResponse: string;
             attachments: string;
-            // Task list strings
-            taskLists: string;
-            noTaskLists: string;
-            tasks: string;
-            closed: string;
-            active: string;
             // Home toolbar labels
             pendingItems: string;
             chatHistory: string;
@@ -135,8 +129,7 @@ import type {
     FileSearchResult,
     ToolCallInteraction,
     RequiredPlanRevisions,
-    StoredInteraction,
-    TaskListSession
+    StoredInteraction
 } from './types';
 
 // Webview initialization
@@ -162,7 +155,6 @@ import type {
     const pendingPlaceholder = document.getElementById('pending-placeholder');
     const pendingRequestsList = document.getElementById('pending-requests-list');
     const pendingReviewsList = document.getElementById('pending-reviews-list');
-    const pendingTaskListsList = document.getElementById('pending-task-lists-list');
     const historyList = document.getElementById('history-list');
     const interactionDetailView = document.getElementById('interaction-detail-view');
     const recentInteractionsList = document.getElementById('recent-interactions-list');
@@ -177,14 +169,12 @@ import type {
 
     // Tab content elements
     const contentPending = document.getElementById('content-pending');
-    const contentTasks = document.getElementById('content-tasks');
     const contentHistory = document.getElementById('content-history');
-    const tasksPlaceholder = document.getElementById('tasks-placeholder');
 
     // History filter state
     let currentHistoryFilter: string = 'all';
 
-    type HomeTab = 'pending' | 'history' | 'tasks';
+    type HomeTab = 'pending' | 'history';
 
     function setHomeToolbarActiveTab(tab: HomeTab): void {
         document.querySelectorAll('.home-toolbar-btn[data-tab]').forEach(btn => {
@@ -202,7 +192,7 @@ import type {
         return String(count);
     }
 
-    function setHomeToolbarBadge(kind: 'pending' | 'tasks' | 'history', count: number): void {
+    function setHomeToolbarBadge(kind: 'pending' | 'history', count: number): void {
         const el = document.querySelector(`.home-toolbar-badge[data-badge-for="${kind}"]`) as HTMLElement | null;
         if (!el) return;
 
@@ -239,19 +229,14 @@ import type {
         const pendingReviewsCount = pendingReviewsList ? pendingReviewsList.querySelectorAll('.pending-review-item').length : 0;
 
         const pendingCount = pendingRequestsCount + pendingReviewsCount;
-
-        const tasksCount = pendingTaskListsList ? pendingTaskListsList.querySelectorAll('.task-list-item').length : 0;
-
         const historyCount = historyList ? historyList.querySelectorAll('.history-item').length : 0;
 
         // Keep UI minimal: numeric badge only for pending.
         setHomeToolbarBadge('pending', pendingCount);
-        setHomeToolbarBadge('tasks', 0);
         setHomeToolbarBadge('history', 0);
 
         // Still expose counts via tooltip/aria without changing layout.
         setHomeToolbarLabelWithCount('pending', pendingCount);
-        setHomeToolbarLabelWithCount('tasks', tasksCount);
         setHomeToolbarLabelWithCount('history', historyCount);
     }
 
@@ -303,10 +288,6 @@ import type {
                     show = true;
                 }
 
-                else if (filter === 'taskList') {
-                    show = type === 'taskList';
-                }
-
                 else if (filter === 'ask_user') {
                     show = type === 'ask_user';
                 }
@@ -354,24 +335,13 @@ import type {
             if (deleteBtn) {
                 e.stopPropagation();
                 const id = deleteBtn.getAttribute('data-id');
-                const type = deleteBtn.getAttribute('data-type');
                 if (!id) return;
 
-                if (type === 'taskList') {
-                    vscode.postMessage({
-                        type: 'deleteTaskList', listId: id
-                    }
-
-                    );
+                vscode.postMessage({
+                    type: 'deleteInteraction', interactionId: id
                 }
 
-                else {
-                    vscode.postMessage({
-                        type: 'deleteInteraction', interactionId: id
-                    }
-
-                    );
-                }
+                );
 
                 return;
             }
@@ -383,15 +353,7 @@ import type {
             const type = item.getAttribute('data-type');
             if (!id) return;
 
-            if (type === 'taskList') {
-                vscode.postMessage({
-                    type: 'openTaskList', listId: id
-                }
-
-                );
-            }
-
-            else if (type === 'plan_review') {
+            if (type === 'plan_review') {
                 vscode.postMessage({
                     type: 'openPlanReviewPanel', interactionId: id
                 }
@@ -604,10 +566,9 @@ import type {
     /**
  * Switch between tabs in the home view
  */
-    function switchTab(tab: 'pending' | 'history' | 'tasks'): void {
+    function switchTab(tab: 'pending' | 'history'): void {
         // Update content panes visibility
         contentPending?.classList.toggle('hidden', tab !== 'pending');
-        contentTasks?.classList.toggle('hidden', tab !== 'tasks');
         contentHistory?.classList.toggle('hidden', tab !== 'history');
 
         setHomeToolbarActiveTab(tab);
@@ -616,7 +577,6 @@ import type {
         const tabNames: Record<string, string> = {
             pending: window.__STRINGS__?.pendingItems || 'Pending Items',
             history: window.__STRINGS__?.chatHistory || 'Chat History',
-            tasks: window.__STRINGS__?.taskLists || 'Task Lists'
         }
 
             ;
@@ -637,17 +597,6 @@ import type {
 
         if (pendingPlaceholder) {
             pendingPlaceholder.classList.toggle('hidden', hasRequests || hasReviews);
-        }
-    }
-
-    /**
- * Update the tasks placeholder visibility
- */
-    function updateTasksPlaceholder(): void {
-        const hasTaskLists = ! !(pendingTaskListsList && pendingTaskListsList.children.length > 0);
-
-        if (tasksPlaceholder) {
-            tasksPlaceholder.classList.toggle('hidden', hasTaskLists);
         }
     }
 
@@ -867,81 +816,14 @@ import type {
     }
 
     /**
-     * Render active task lists in the tasks tab
+     * Render unified history (ask_user + plan_review), sorted by timestamp desc.
      */
-    function renderActiveTaskLists(taskLists: TaskListSession[]): void {
-        if (!pendingTaskListsList) return;
-
-        if (taskLists.length === 0) {
-            clearChildren(pendingTaskListsList);
-            updateTasksPlaceholder();
-            updateHomeToolbarBadgesFromDom();
-            return;
-        }
-
-        clearChildren(pendingTaskListsList);
-
-        for (const taskList of taskLists) {
-            const completedCount = taskList.tasks.filter(t => t.status === 'completed').length;
-            const totalCount = taskList.tasks.length;
-            const progressText = `${completedCount}/${totalCount} ${window.__STRINGS__?.tasks || 'tasks'}`;
-
-            const item = el('div', {
-                className: 'request-item task-list-item',
-                attrs: { 'data-id': taskList.id, tabindex: '0' }
-            });
-
-            const title = el('div', { className: 'request-item-title' });
-            appendChildren(title, codicon('tasklist'), ' ', (taskList.title || 'Task List'));
-
-            const preview = el('div', { className: 'request-item-preview', text: progressText });
-
-            const meta = el('div', { className: 'request-item-meta' });
-            const badge = el('span', { className: 'status-badge status-active', text: window.__STRINGS__?.active || 'Active' });
-            const time = el('span', { text: formatTime(taskList.lastActivity) });
-            const deleteBtn = el('button', {
-                className: 'task-list-delete',
-                title: 'Remove',
-                attrs: { type: 'button', 'data-id': taskList.id }
-            }, codicon('trash'));
-
-            deleteBtn.addEventListener('click', (e: Event) => {
-                e.stopPropagation();
-                vscode.postMessage({ type: 'deleteTaskList', listId: taskList.id });
-            });
-
-            appendChildren(meta, badge, ' ', time, deleteBtn);
-            appendChildren(item, title, preview, meta);
-
-            item.addEventListener('click', (e: Event) => {
-                if ((e.target as HTMLElement).closest('.task-list-delete')) return;
-                vscode.postMessage({ type: 'openTaskList', listId: taskList.id });
-            });
-
-            item.addEventListener('keydown', (e: Event) => {
-                const keyEvent = e as KeyboardEvent;
-                if (keyEvent.key !== 'Enter' && keyEvent.key !== ' ') return;
-                e.preventDefault();
-                vscode.postMessage({ type: 'openTaskList', listId: taskList.id });
-            });
-
-            pendingTaskListsList.appendChild(item);
-        }
-
-        // Update placeholder visibility
-        updateTasksPlaceholder();
-        updateHomeToolbarBadgesFromDom();
-    }
-
-    /**
-     * Render unified history (ask_user + plan_review + closed task lists), sorted by timestamp desc.
-     */
-    function renderUnifiedHistory(interactions: StoredInteraction[], closedTaskLists: TaskListSession[]): void {
+    function renderUnifiedHistory(interactions: StoredInteraction[]): void {
         if (!historyList) return;
 
         type UnifiedEntry = {
             id: string;
-            type: 'ask_user' | 'plan_review' | 'taskList';
+            type: 'ask_user' | 'plan_review';
             timestamp: number;
             title: string;
             preview: string;
@@ -970,23 +852,6 @@ import type {
             );
         }
 
-        for (const taskList of closedTaskLists || []) {
-            const completedCount = taskList.tasks.filter(t => t.status === 'completed').length;
-            const totalCount = taskList.tasks.length;
-
-            const progressText = `${completedCount}/${totalCount}${window.__STRINGS__?.tasks || 'tasks'}`;
-
-            entries.push({
-                id: taskList.id,
-                type: 'taskList',
-                timestamp: taskList.lastActivity || taskList.createdAt,
-                title: taskList.title || 'Task List',
-                preview: progressText
-            }
-
-            );
-        }
-
         // Sort newest first, regardless of type
         entries.sort((a, b) => b.timestamp - a.timestamp);
 
@@ -1004,32 +869,6 @@ import type {
         const fragment = document.createDocumentFragment();
 
         for (const entry of entries) {
-            if (entry.type === 'taskList') {
-                const item = el('div', {
-                    className: 'history-item task-list-history-item',
-                    attrs: { 'data-id': entry.id, 'data-type': 'taskList', tabindex: '0' }
-                });
-
-                const header = el('div', { className: 'history-item-header' });
-                const title = el('span', { className: 'history-item-title', text: entry.title });
-                const deleteBtn = el('button', {
-                    className: 'history-item-delete',
-                    title: 'Remove',
-                    attrs: { type: 'button', 'data-id': entry.id, 'data-type': 'taskList' }
-                }, codicon('trash'));
-                appendChildren(header, codicon('tasklist'), ' ', title, deleteBtn);
-
-                const preview = el('div', { className: 'history-item-preview', text: entry.preview });
-                const meta = el('div', { className: 'history-item-meta' });
-                const closedBadge = el('span', { className: 'status-badge status-closed', text: window.__STRINGS__?.closed || 'Closed' });
-                const time = el('span', { className: 'history-item-time', text: formatTime(entry.timestamp) });
-                appendChildren(meta, closedBadge, ' ', time);
-
-                appendChildren(item, header, preview, meta);
-                fragment.appendChild(item);
-                continue;
-            }
-
             const isPlanReview = entry.type === 'plan_review';
             const icon = isPlanReview ? 'file-text' : 'comment';
             const statusClass = entry.status || 'pending';
@@ -2037,24 +1876,13 @@ import type {
                     renderPendingReviews(message.pendingPlanReviews);
                 }
 
-                // Update active task lists if provided
-                if (message.activeTaskLists) {
-                    renderActiveTaskLists(message.activeTaskLists);
-                }
-
                 // Update history interactions if provided
-                renderUnifiedHistory(message.historyInteractions || [], message.closedTaskLists || []);
+                renderUnifiedHistory(message.historyInteractions || []);
                 // Auto-switch to pending tab if there are pending requests/reviews
-                // Task lists are now in their own tab
                 const totalPending = (message.pendingRequests?.length || 0) + (message.pendingPlanReviews?.length || 0);
 
                 if (totalPending > 0) {
                     switchTab('pending');
-                }
-
-                else if (message.activeTaskLists?.length || 0 > 0) {
-                    // If no pending items but there are active task lists, show tasks tab
-                    switchTab('tasks');
                 }
 
                 break;

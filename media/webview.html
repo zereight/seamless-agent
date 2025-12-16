@@ -53,21 +53,6 @@
           <button
             type="button"
             class="home-toolbar-btn"
-            data-tab="tasks"
-            data-label="{{taskLists}}"
-            title="{{taskLists}}"
-            aria-label="{{taskLists}}"
-            aria-pressed="false"
-          >
-            <span class="codicon codicon-tasklist"></span>
-            <span
-              class="home-toolbar-badge hidden"
-              data-badge-for="tasks"
-            ></span>
-          </button>
-          <button
-            type="button"
-            class="home-toolbar-btn"
             data-tab="history"
             data-label="{{chatHistory}}"
             title="{{chatHistory}}"
@@ -101,54 +86,10 @@
               </p>
               <div id="pending-requests-list"></div>
               <div id="pending-reviews-list"></div>
-
-              <!-- Resume Task Input Card (shown when resume_task called without ID) -->
-              <div id="resume-task-card" class="resume-task-card hidden">
-                <div class="resume-task-header">
-                  <span class="codicon codicon-debug-continue"></span>
-                  <h3>{{resumeTaskList}}</h3>
-                  <button
-                    id="resume-task-close"
-                    class="btn-icon"
-                    title="{{cancel}}"
-                    aria-label="{{cancel}}"
-                  >
-                    <span class="codicon codicon-close"></span>
-                  </button>
-                </div>
-                <p class="resume-task-description">{{resumeTaskDescription}}</p>
-                <div
-                  id="resume-available-lists"
-                  class="resume-available-lists hidden"
-                >
-                  <p class="resume-lists-label">{{availableLists}}</p>
-                  <div id="resume-lists-container"></div>
-                </div>
-                <div class="resume-task-input-row">
-                  <input
-                    type="text"
-                    id="resume-list-id-input"
-                    class="resume-input"
-                    placeholder="{{resumeIdPlaceholder}}"
-                  />
-                  <button id="resume-confirm-btn" class="btn btn-primary">
-                    <span class="codicon codicon-play"></span>
-                    {{resumeConfirm}}
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
 
-          <!-- Task Lists Tab -->
-          <div id="content-tasks" class="tab-pane hidden">
-            <div id="tasks-items-container">
-              <p id="tasks-placeholder" class="placeholder">{{noTaskLists}}</p>
-              <div id="pending-task-lists-list"></div>
-            </div>
-          </div>
-
-          <!-- History Tab (Individual Interactions + Closed Task Lists) -->
+          <!-- History Tab (Individual Interactions) -->
           <div id="content-history" class="tab-pane hidden">
             <!-- History Filter Bar -->
             <div class="filter-bar">
@@ -159,14 +100,6 @@
                 aria-label="{{historyFilterAll}}"
               >
                 <span class="codicon codicon-list-unordered"></span>
-              </button>
-              <button
-                class="filter-btn"
-                data-filter="taskList"
-                title="{{historyFilterTaskLists}}"
-                aria-label="{{historyFilterTaskLists}}"
-              >
-                <span class="codicon codicon-tasklist"></span>
               </button>
               <button
                 class="filter-btn"
@@ -314,22 +247,10 @@
         response: "{{response}}",
         noResponse: "{{noResponse}}",
         attachments: "{{attachments}}",
-        // Task list strings
-        taskLists: "{{taskLists}}",
-        noTaskLists: "{{noTaskLists}}",
-        tasks: "{{tasks}}",
-        closed: "{{closed}}",
-        active: "{{active}}",
         // Home toolbar labels
         pendingItems: "{{pendingItems}}",
         chatHistory: "{{chatHistory}}",
         clearHistory: "{{clearHistory}}",
-        // Resume task strings
-        resumeTaskList: "{{resumeTaskList}}",
-        resumeTaskDescription: "{{resumeTaskDescription}}",
-        resumeIdPlaceholder: "{{resumeIdPlaceholder}}",
-        resumeConfirm: "{{resumeConfirm}}",
-        availableLists: "{{availableLists}}",
       };
     </script>
     <script nonce="{{nonce}}" src="{{scriptUri}}"></script>

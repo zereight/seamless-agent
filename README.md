@@ -15,10 +15,11 @@ A Language Model tool that enables Copilot to interactively prompt you for confi
 
 - **User Confirmation** — Get explicit approval before Copilot executes critical actions
 - **Interactive Input** — Provide additional context or instructions mid-conversation
+
+  - **Paste Images** — Paste images directly into the input area for context
+  - **References & Attachments** — Reference files in your workspace using `#filename` and attach files to your response
+
 - **Task Validation** — Confirm whether a task was fulfilled your specs
-- **Seamless Integration** — Works naturally within the Copilot Chat workflow
-- **Paste Images** — Paste images directly into the input area for context
-- **References & Attachments** — Reference files in your workspace using `#filename` and attach files to your response
 
 ### Plan Review Tool (`#planReview`)
 
@@ -39,33 +40,15 @@ A Language Model tool that presents Markdown content as a step-by-step walkthrou
 - **Comment Support** — Add feedback anchored to specific parts of the walkthrough
 - **Structured Output** — Returns `{ status, requiredRevisions: [{ revisedPart, revisorInstructions }], reviewId }`
 
-### Task List Flow Tools
-
-Interactive task lists visible in real-time (with a dedicated panel) so you can track progress and leave feedback while the agent is working.
-
-- **Live Task List Panel** — Walkthrough-style UI with task status and progress
-- **Task Comments** — Add comments to any task, including reopening a completed task if needed
-- **History Integration** — Closed task lists appear in History
-
-#### Recommended Task List flow
-
-To ensure the agent receives your comments **before** executing each task, use the flow tools below:
-
-- `#createTaskList` → creates the list and returns `listId`
-- `#getNextTask` → returns the next pending task **plus pending comments for that task**
-- `#updateTaskStatus` → updates task status (in-progress / completed / blocked). Then call `#getNextTask` to fetch the next task + its comments
-- `#closeTaskList` → archives the list and returns a summary
-
-### History (Requests, Plan Reviews, Task Lists)
+### History (Requests, Plan Reviews)
 
 The Seamless Agent panel includes a unified History timeline (newest first), with filters:
 
 - **All**
-- **Task Lists**
 - **Ask User**
 - **Plan Review**
 
-You can open ask_user details, open plan review panels from history, open closed task lists, and delete individual items.
+You can open ask_user details, open plan review panels from history, and delete individual items.
 
 ### Approve Plan Tool (`#approvePlan`) (Deprecated)
 
@@ -104,18 +87,6 @@ Use this when you want a step-by-step guide presented for review/feedback.
 3. Click **Approve** or **Request Changes**
 4. Copilot continues based on `{ status, requiredRevisions, reviewId }`
 
-### Using Task Lists (recommended flow)
-
-At a high level, the agent should:
-
-1. Create the list with `#createTaskList` (store `listId`)
-2. Loop:
-   - Call `#getNextTask`
-   - Apply any returned `comments[]` **before** executing the task
-   - Execute the task
-   - Call `#updateTaskStatus`
-3. When done, call `#closeTaskList`
-
 ## Tips
 
 ### Recommended System Prompt
@@ -127,8 +98,6 @@ When the task requires multiple steps or non-trivial changes, present a detailed
 If the plan is rejected, incorporate the comments and submit an updated plan with #planReview.
 When the user asks for a step-by-step guide or walkthrough, present it using #walkthroughReview.
 Always use #askUser before completing any task to confirm the result matches what the user asked for.
-
-When using task lists, prefer the flow: #createTaskList → #getNextTask → #updateTaskStatus → ... → #closeTaskList.
 ```
 
 You can add this into your `.github/copilot-instructions.md` file in your project

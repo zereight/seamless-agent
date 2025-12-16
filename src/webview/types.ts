@@ -1,5 +1,3 @@
-import type { TaskListSession, TaskItem, TaskComment } from "../tools/taskListSchemas";
-
 // Comment structure for feedback
 export interface RequiredPlanRevisions {
     revisedPart: string;
@@ -25,10 +23,6 @@ export interface StoredInteraction {
     requiredRevisions?: RequiredPlanRevisions[];
     status?: 'pending' | 'approved' | 'recreateWithChanges' | 'acknowledged' | 'closed' | 'cancelled';
 }
-
-// Re-export task list types from tools module for webview usage
-export type { TaskListSession, TaskItem, TaskComment } from "../tools/taskListSchemas";
-
 
 // Attachment info
 export interface AttachmentInfo {
@@ -103,21 +97,8 @@ export type ToWebviewMessage = | {
         type: 'showHome';
         pendingRequests: RequestItem[];
         pendingPlanReviews: StoredInteraction[];
-        activeTaskLists: TaskListSession[];
         historyInteractions: StoredInteraction[];
-        closedTaskLists: TaskListSession[];
         recentInteractions: ToolCallInteraction[]
-    }
-
-    | {
-        type: 'showResumeTaskInput';
-        requestId: string;
-        availableLists: Array<{ id: string; title: string }>;
-    }
-
-    | {
-        type: 'resumeTaskInputCancelled';
-        requestId: string;
     }
 
     | {
@@ -144,7 +125,7 @@ export type ToWebviewMessage = | {
 
     | {
         type: 'switchTab';
-        tab: 'pending' | 'history' | 'tasks'
+        tab: 'pending' | 'history'
     }
 
     | {
@@ -239,27 +220,7 @@ export type FromWebviewMessage = | {
         type: 'deleteInteraction';
         interactionId: string
     }
-
-    | {
-        type: 'openTaskList';
-        listId: string
-    }
-
-    | {
-        type: 'deleteTaskList';
-        listId: string
-    }
-
-    | {
-        type: 'resumeTaskInputSubmit';
-        requestId: string;
-        listId: string
-    }
-
-    | {
-        type: 'resumeTaskInputCancel';
-        requestId: string
-    };
+    ;
 
 
 // Plan review types (shared between extension and webview)
@@ -294,24 +255,6 @@ export type PlanReviewPanelFromWebviewMessage =
     | { type: 'editComment'; index: number; revisorInstructions: string }
     | { type: 'removeComment'; index: number }
     | { type: 'exportPlan' };
-
-// Messages for task list panel
-export type TaskListPanelToWebviewMessage =
-    | { type: 'showTaskList'; listId: string; title: string; tasks: TaskItem[]; closed: boolean }
-    | { type: 'updateTasks'; tasks: TaskItem[] }
-    | { type: 'listClosed' }
-    | { type: 'requestBreakpointInput'; taskId: string; taskTitle: string }
-    | { type: 'breakpointInputCancelled'; taskId: string };
-
-export type TaskListPanelFromWebviewMessage =
-    | { type: 'addComment'; taskId: string; revisedPart: string; revisorInstructions: string; reopened: boolean }
-    | { type: 'removeComment'; taskId: string; commentId: string }
-    | { type: 'close' }
-    | { type: 'breakpointInputSubmit'; taskId: string; instruction: string }
-    | { type: 'breakpointInputCancel'; taskId: string }
-    | { type: 'copyListId'; listId: string }
-    | { type: 'toggleBreakpoint'; taskId: string; breakpoint: boolean };
-
 // File search result for autocomplete
 export interface FileSearchResult {
     name: string;
