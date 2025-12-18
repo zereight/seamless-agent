@@ -1395,6 +1395,7 @@ button:disabled {
     flex-direction: column;
     flex-shrink: 1;
     overflow: hidden;
+    min-height: 5.4em;
 }
 
 .detail-label {
