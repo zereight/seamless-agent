@@ -147,6 +147,9 @@ import type {
     let autocompleteStartPos = -1;
     let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+    // IME composition state - prevents scroll issues on Windows during IME input
+    let isComposing = false;
+
     // DOM Elements
     const homeView = document.getElementById('home-view');
     const pendingPlaceholder = document.getElementById('pending-placeholder');
@@ -1472,6 +1475,9 @@ import type {
     function autoResizeTextarea(): void {
         if (!responseInput) return;
 
+        // Skip resize during IME composition to prevent scroll issues on Windows
+        if (isComposing) return;
+
         // Reset height to auto to get accurate scrollHeight
         responseInput.style.height = 'auto';
         responseInput.style.overflow = 'hidden';
@@ -1734,6 +1740,17 @@ import type {
 
     // Textarea input handler for # autocomplete trigger
     responseInput?.addEventListener('input', handleTextareaInput);
+
+    // IME composition handlers - prevent scroll issues on Windows during IME input
+    responseInput?.addEventListener('compositionstart', () => {
+        console.log(`composing start`)
+        isComposing = true;
+    });
+
+    responseInput?.addEventListener('compositionend', () => {
+        console.log(`composing end`)
+        isComposing = false;
+    });
 
     // Image paste handler
     responseInput?.addEventListener('paste', handlePaste);
