@@ -5,8 +5,7 @@
 
 ### Features
 
-* Add delete buttons to pending notification cards ([9acbedc](https://github.com/jraylan/seamless-agent/commit/9acbedc610cc5c056940c9f50ed4354d674e781f))
-* Add Delete Buttons to Pending Notification Cards ([c0a0216](https://github.com/jraylan/seamless-agent/commit/c0a02161b97bed88217589695ebe4de9dc265da4))
+* Add delete Buttons to pending notification cards ([9acbedc](https://github.com/jraylan/seamless-agent/commit/9acbedc610cc5c056940c9f50ed4354d674e781f))
 
 
 ### Bug Fixes
